@@ -1,0 +1,15 @@
+* Project progress, goals, scope, milestones
+- [X] Set up SQLite database
+- [ ] Create Go app to provide abilities to add, modify, view and delete books
+  from library (manually) -- CRUD
+- [ ] Search interface
+- [ ] Add books by ISBN or title/author and automatically fetch data
+- [ ] Provide API for dealing with data in JSON
+- [ ] Create React frontend for interacting
+- [ ] Consider how to use multiple users
+- [ ] Add categories for books, allowing browsing in different categories
+- [ ] Advanced search options for various fields
+* Issues and technical notes
+- Currently using SQLite3 database, seems well suited to this as a personal
+  project. But probably not suited to scaling to production, so will probably
+  need to swap out to a MySQL or PostgreSQL database for deployment.
