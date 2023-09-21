@@ -1,0 +1,126 @@
+* Database design
+#+NAME: Book table
+| Column         | data type (SQLite) | constraints |
+|----------------+--------------------+-------------|
+| _Book ID_        | integer            | Primary key |
+| Title          | text               |             |
+| Subtitle       | text               |             |
+| Year           | integer            |             |
+| Edition        | integer            |             |
+| Publisher ID   | text               | FK          |
+| ISBN           | text(?)            |             |
+| Series ID      | text               | FK          |
+| Status         | text               |             |
+| Purchased date | text               |             |
+
+#+NAME: People table
+| Column    | data type (SQLite) | constraints |
+|-----------+--------------------+-------------|
+| Person ID | integer            | Primary key |
+| Name      | text               |             |
+
+#+NAME: book_author table
+| Column    | data type (SQLite) | constraints |
+|-----------+--------------------+-------------|
+| Book ID   | integer            | FK          |
+| Person ID | integer            | FK          |
+
+#+NAME: book_editor table
+| Column    | data type (SQLite) | constraints |
+|-----------+--------------------+-------------|
+| Book ID   | integer            | FK          |
+| Person ID | integer            | FK          |
+
+#+NAME: publishers table
+| Column         | data type (SQLite) | constraints |
+|----------------+--------------------+-------------|
+| Publisher ID   | integer            | primary key |
+| Publisher name | text               |             |
+
+#+NAME: series table
+| Column      | data type (SQLite) | constraints |
+|-------------+--------------------+-------------|
+| Series ID   | integer            | primary key |
+| Series name | text               |             |
+
+
+People table (Authors and editors)
+Author-book link table
+Editor-book link table
+Translator-book link table
+
+Status table: owned, previously owned, wanted, nice-to-get
+
+Series-book link table
+
+* Working example model
+
+Book table
+| Book ID | Title                                            | Subtitle                                              | Year | Edition | Publisher ID |              ISBN | Series ID | Status | Purchased Date |
+|---------+--------------------------------------------------+-------------------------------------------------------+------+---------+--------------+-------------------+-----------+--------+----------------|
+|       1 | Introduction to the Old Testament                |                                                       | 1969 |         |            1 |     0-85111-723-6 |           | Owned  | May 2023       |
+|       2 | Divine Impassibility                             | Four Views of God's Emotions and Suffering            | 2019 |         |            1 | 978-0-8308-5253-6 |         1 | Owned  | October 2019   |
+|       3 | Basic Writings                                   |                                                       | 2007 |         |            2 | 978-0-87220-895-7 |           | Owned  | October 2015   |
+|       4 | How to Read and Understand the Biblical Prophets |                                                       | 2017 |         |            3 | 978-1-4335-5403-8 |           | Owned  | July 2021      |
+|       5 | Kingdom through Covenant                         | A Biblical-Theological Understanding of the Covenants | 2018 |       2 |            3 | 978-1-4335-5307-3 |           | Owned  | January 2022   |
+|       6 | Christianity and Science                         |                                                       | 2023 |         |            3 | 978-1-4335-7920-2 |           | Want   |                |
+
+
+Person table
+| Person ID | Name                  |
+|-----------+-----------------------|
+|         1 | R. K. Harrison        |
+|         2 | Anselm                |
+|         3 | Peter J. Gentry       |
+|         4 | Stephen J. Wellum     |
+|         5 | Herman Bavinck        |
+|         6 | Robert J. Matz        |
+|         7 | A. Chadwick Thornhill |
+|         8 | Thomas Williams       |
+|         9 | N. Gray Sutanto       |
+|        10 | James Eglinton        |
+|        11 | Cory C. Brock         |
+
+Book-author
+| Book ID | Person ID |
+|---------+-----------|
+|       1 |         1 |
+|       3 |         2 |
+|       4 |         3 |
+|       5 |         3 |
+|       5 |         4 |
+|       6 |         5 |
+
+Book-editor
+| Book ID | Person ID |
+|---------+-----------|
+|       2 |         6 |
+|       2 |         7 |
+|       3 |         8 |
+|       6 |         9 |
+|       6 |        10 |
+|       6 |        11 |
+
+Publishers
+| Publisher ID | Publisher Name |
+|--------------+----------------|
+|            1 | IVP            |
+|            2 | Hackett        |
+|            3 | Crossway       |
+
+Series
+| Series ID | Series Name |
+|-----------+-------------|
+|         1 | Spectrum Multiview Books |
+
+
+
+
+
+* Scratch pad
+("Introduction to the Old Testament", NULL, 1969,  NULL, 1, "0-85111-723-6", NULL, "Owned", "May 2023"),
+("Divine Impassibility", "Four Views of God's Emotions and Suffering", 2019,  NULL, 1, "978-0-8308-5253-6", 1, "Owned", "October 2019"),
+("Basic Writings", NULL, 2007, NULL, 2, "978-0-87220-895-7", NULL, "Owned", "October 2015"),
+("How to Read and Understand the Biblical Prophets", NULL, 2017, NULL, 3, "978-1-4335-5403-8", NULL, "Owned", "July 2021"),
+("Kingdom through Covenant", "A Biblical-Theological Understanding of the Covenants", 2018, 2, 3, "978-1-4335-5307-3", NULL, "Owned", "January 2022"),
+("Christianity and Science", NULL, 2023, NULL, 3, "978-1-4335-7920-2", NULL, "Want", NULL)
