@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"time"
 	"strings"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -30,28 +30,28 @@ func (pd PurchasedDate) String() string {
 }
 
 func (pd *PurchasedDate) setDate(s string) error {
-    params := strings.Split(s, " ")
+	params := strings.Split(s, " ")
 	switch len(params) {
 	case 0:
-	    return fmt.Errorf("setDate: Can't convert date %v", s)
+		return fmt.Errorf("setDate: Can't convert date %v", s)
 	case 1:
-	    dateString := "2006"
+		dateString := "2006"
 		t, err := time.Parse(dateString, s)
 		if err != nil {
 			return fmt.Errorf("setDate: Problem parsing year %v, %v", s, err)
 		}
 		pd.year = t.Year()
 	case 2:
-	    dateString := "January 2006"
+		dateString := "January 2006"
 		t, err := time.Parse(dateString, s)
 		if err != nil {
 			return fmt.Errorf("setDate: Problem parsing month-year date %v, %v",
-			    s, err)
+				s, err)
 		}
 		pd.year = t.Year()
 		pd.month = t.Month()
 	case 3:
-	    dateString := "2 January 2006"
+		dateString := "2 January 2006"
 		t, err := time.Parse(dateString, s)
 		if err != nil {
 			return fmt.Errorf("setDate: Problem parsing day-month-year date %v, %v",
@@ -160,6 +160,28 @@ func formatNameList(names []string) string {
 		s += names[len(names)-1]
 		return s
 	}
+}
+
+func nameListFromString(nameString string) []string {
+	if len(nameString) == 0 {
+		var retval []string
+		return retval
+	}
+
+	splitAnd := strings.Split(nameString, " and ")
+
+	if len(splitAnd) == 1 {
+		return splitAnd
+	}
+	splitComma := strings.Split(splitAnd[0], ", ")
+
+	var nameList []string
+	for _, name := range splitComma {
+		nameList = append(nameList, name)
+	}
+	nameList = append(nameList, splitAnd[1])
+
+	return nameList
 }
 
 func getAuthorsListById(db *sql.DB, id int) ([]string, error) {
@@ -295,10 +317,187 @@ func printBookList(db *sql.DB) ([]Book, error) {
 
 		fmt.Println(book)
 		bookList = append(bookList, book)
-
 	}
 
 	return bookList, nil
+}
+
+func personId(db *sql.DB, person string) (int, error) {
+	var id int
+	if err := db.QueryRow("SELECT person_id FROM people WHERE name = ?",
+		person).Scan(&id); err != nil {
+		if err == sql.ErrNoRows {
+			result, err := db.Exec("INSERT INTO people (name) VALUES (?)", person)
+			if err != nil {
+				return 0, fmt.Errorf("personId, %v", err)
+			}
+			liid, err := result.LastInsertId()
+			if err != nil {
+				return 0, fmt.Errorf("personId, %v", err)
+			}
+			id = int(liid)
+		} else {
+			return 0, fmt.Errorf("personId, %v", err)
+		}
+	}
+	return id, nil
+}
+
+func publisherId(db *sql.DB, publisher string) (int, error) {
+	var id int
+	if err := db.QueryRow("SELECT publisher_id FROM publishers WHERE name = ?",
+		publisher).Scan(&id); err != nil {
+		if err == sql.ErrNoRows {
+			result, err := db.Exec("INSERT INTO publishers (name) VALUES (?)",
+				publisher)
+			if err != nil {
+				return 0, fmt.Errorf("publisherId, %v", err)
+			}
+			liid, err := result.LastInsertId()
+			if err != nil {
+				return 0, fmt.Errorf("publisherId, %v", err)
+			}
+			id = int(liid)
+		} else {
+			return 0, fmt.Errorf("publisherId, %v", err)
+		}
+	}
+	return id, nil
+}
+
+func seriesId(db *sql.DB, series string) (int, error) {
+	var id int
+	if err := db.QueryRow("SELECT series_id FROM series WHERE series_name = ?",
+		series).Scan(&id); err != nil {
+		if err == sql.ErrNoRows {
+			result, err := db.Exec("INSERT INTO series (series_name) VALUES (?)",
+				series)
+			if err != nil {
+				return 0, fmt.Errorf("seriesId, %v", err)
+			}
+			liid, err := result.LastInsertId()
+			if err != nil {
+				return 0, fmt.Errorf("seriesId, %v", err)
+			}
+			id = int(liid)
+		} else {
+			return 0, fmt.Errorf("seriesId, %v", err)
+		}
+	}
+	return id, nil
+}
+
+func addBook(db *sql.DB, b *Book) (int, error) {
+	// [todo] - check that book isn't already in database
+	// Write a function which handles checking, using ISBN if available, else
+	// combination of author/editors, title and edition. Return id with an error
+	// if book is in library, otherwise, return 0 and nil error.
+
+	// handle people
+	var authorList, editorList []string
+	authorList = nameListFromString(b.author)
+	editorList = nameListFromString(b.editor)
+
+	// Create lists of author ids from the author lists
+	var authorIdList, editorIdList []int
+	for _, authorName := range authorList {
+		authorId, err := personId(db, authorName)
+		if err != nil {
+			return 0, fmt.Errorf("addBook, %v", err)
+		}
+		authorIdList = append(authorIdList, authorId)
+	}
+	for _, editorName := range editorList {
+		editorId, err := personId(db, editorName)
+		if err != nil {
+			return 0, fmt.Errorf("addBook, %v", err)
+		}
+		editorIdList = append(editorIdList, editorId)
+	}
+
+	// handle publisher
+	pubId, err := publisherId(db, b.publisher)
+	if err != nil {
+		return 0, fmt.Errorf("addBook, issue with publisher, %v", err)
+	}
+
+	// handle series
+	var serId int
+	if len(b.series) != 0 {
+		serId, err = seriesId(db, b.series)
+		if err != nil {
+			return 0, fmt.Errorf("addBook, issue with series, %v", err)
+		}
+	} else {
+		serId = -1
+	}
+
+	// insert book -- at this point, use a transaction to ensure author/editor
+	// info is included for every book in the database.
+	tx, err := db.Begin()
+	if err != nil {
+		return 0, fmt.Errorf("addBook, Couldn't start sql transaction: %v", err)
+	}
+	defer tx.Rollback()
+
+	var bookId int
+
+	if serId != -1 {
+		result, err := tx.Exec(`INSERT INTO books (title, subtitle, year, edition,
+                            publisher_id, isbn, series_id, status,
+                            purchased_date) VALUES (?, ?, ?, ?, ?, ?, ?,
+                            ?, ?)`,
+			b.title, b.subtitle, b.year, b.edition, pubId, b.isbn,
+			serId, b.status, b.purchased.String())
+
+		if err != nil {
+			return 0, fmt.Errorf("addBook: %v", err)
+		}
+		liid, err := result.LastInsertId()
+		if err != nil {
+			return 0, fmt.Errorf("addBook: %v", err)
+		}
+		bookId = int(liid)
+	} else {
+		result, err := tx.Exec(`INSERT INTO books (title, subtitle, year, edition,
+                            publisher_id, isbn, status, purchased_date) VALUES
+			                (?, ?, ?, ?, ?, ?, ?, ?)`,
+			b.title, b.subtitle, b.year, b.edition, pubId, b.isbn,
+			b.status, b.purchased.String())
+
+		if err != nil {
+			return 0, fmt.Errorf("addBook: %v", err)
+		}
+		liid, err := result.LastInsertId()
+		if err != nil {
+			return 0, fmt.Errorf("addBook: %v", err)
+		}
+		bookId = int(liid)
+	}
+
+	// handle book_author
+	for _, authId := range authorIdList {
+		_, err = tx.Exec("INSERT INTO book_author VALUES (?, ?)", bookId,
+			authId)
+		if err != nil {
+			return 0, fmt.Errorf("addBook: %v", err)
+		}
+	}
+
+	// handle book_editor
+	for _, edId := range editorIdList {
+		_, err = tx.Exec("INSERT INTO book_editor VALUES (?, ?)", bookId, edId)
+		if err != nil {
+			return 0, fmt.Errorf("addBook: %v", err)
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return 0, fmt.Errorf("addBook, issue adding book: %v", err)
+	}
+
+	return bookId, nil
 }
 
 func main() {
@@ -312,6 +511,7 @@ func main() {
 		log.Fatal(pingErr)
 	}
 	fmt.Println("Connected to db!")
+	defer db.Close()
 
 	// Count how many books are in library (a single line query)
 	var volumes int
@@ -343,69 +543,114 @@ func main() {
 
 	fmt.Println("End of library\n")
 
-	// Get the ID of a particular book, in this case, Kingdom though Covenant
-	var id int
-	err = db.QueryRow("SELECT book_id FROM books WHERE title IS 'Kingdom through Covenant'").Scan(&id)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Printf("ID of Kingdom through Covenant: %v\n", id)
+	// 	type Book struct {
+	// 	id        int
+	// 	author    string
+	// 	editor    string
+	// 	title     string
+	// 	subtitle  string
+	// 	year      int
+	// 	edition   int
+	// 	publisher string
+	// 	isbn      string
+	// 	series    string
+	// 	status    string
+	// 	purchased PurchasedDate
+	// }
+	var itts Book
+	itts.author = "Karen H. Jobes and Moisés Silva"
+	itts.title = "Invitation to the Septuagint"
+	itts.year = 2015
+	itts.edition = 2
+	itts.publisher = "Baker Academic"
+	itts.isbn = "978-0-8010-3649-1"
+	itts.status = "Owned"
 
-	// Get the author(s) of a book, method 1: use the book ID
-	sqlStmt := `
-          SELECT people.name
-          FROM people
-          INNER JOIN book_author
-            ON book_author.author_id = people.person_id
-          WHERE book_author.book_id = ?`
-	authorRows, err := db.Query(sqlStmt, 5)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer authorRows.Close()
-	fmt.Print("Authors of book ID #5 are: ")
-	for authorRows.Next() {
-		var authorName string
-		err = authorRows.Scan(&authorName)
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Printf("%v, ", authorName)
-	}
-	fmt.Print("\n")
+	var ittspd PurchasedDate
+	ittspd.setDate("December 2021")
+	itts.purchased = ittspd
 
-	// Get the author(s) of a book, method 2: use book name
-	sqlStmt = `
-          SELECT people.name
-          FROM people
-          INNER JOIN book_author
-            ON book_author.author_id = people.person_id
-          INNER JOIN books
-            ON book_author.book_id = books.book_id
-          WHERE books.title = ?`
-	authorRows, err = db.Query(sqlStmt, "Kingdom through Covenant")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer authorRows.Close()
-	fmt.Print("Authors of Kingdom through Covenant are: ")
-	for authorRows.Next() {
-		var authorName string
-		err = authorRows.Scan(&authorName)
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Printf("%v, ", authorName)
-	}
-	fmt.Print("\n")
+	// [fix] addBook not working! Doesn't add a book. Possibly an issue with
+	// adding an extra blank named person too? Why isn't the book added? Is
+	// there an issue with performing the transaction? But no errors appear to
+	// be raised?
 
-	fmt.Println("Testing use of PurchasedDate type")
-	var myPD PurchasedDate
-	fmt.Printf("Init value is %v\n", &myPD)
-	myPD.setDate("2019")
-	fmt.Printf("Value with year is %v\n", &myPD)
-	myPD.setDate("May 2019")
-	fmt.Printf("Value with year and month is %v\n", &myPD)
-	myPD.setDate("11 May 2019")
-	fmt.Printf("Value with year, month and day is %v\n", &myPD)
+	// id, err := addBook(db, &itts)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+
+	// fmt.Printf("Added new book with id %v\n", id)
+	// volumes, err = countAllBooks(db)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// fmt.Printf("Now there are %v books in library:\n", volumes)
+
+	// var gpe Book
+	// gpe.editor = "Chad Meister and James K. Dew Jr."
+	// gpe.title = "God and the Problem of Evil"
+	// gpe.subtitle = "Five Views"
+	// gpe.year = 2017
+	// gpe.publisher = "IVP Academic"
+	// gpe.isbn = "978-0-8308-4024-3"
+	// gpe.series = "Spectrum Multiview Books"
+	// gpe.status = "Owned"
+
+	// var gpepd PurchasedDate
+	// gpepd.setDate("March 2023")
+	// gpe.purchased = gpepd
+
+	// id, err = addBook(db, &gpe)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// fmt.Printf("Added new book with id %v\n", id)
+
+	// 	type Book struct {
+	// 	id        int
+	// 	author    string
+	// 	editor    string
+	// 	title     string
+	// 	subtitle  string
+	// 	year      int
+	// 	edition   int
+	// 	publisher string
+	// 	isbn      string
+	// 	series    string
+	// 	status    string
+	// 	purchased PurchasedDate
+	// }
+
+	// var tag Book
+	// tag.editor = "Simon Gathercole"
+	// tag.title = "The Apocryphal Gospels"
+	// tag.year = 2021
+	// tag.publisher = "Penguin"
+	// tag.isbn = "978-0-241-34055-4"
+	// tag.series = "Penguin Classics"
+	// tag.status = "Owned"
+
+	// var tagpd PurchasedDate
+	// tagpd.setDate("March 2023")
+	// tag.purchased = tagpd
+
+	// id, err = addBook(db, &tag)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+
+	// fmt.Printf("Added new book with id %v\n", id)
+
+	// id, err := personId(db, "Peter J. Gentry")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// fmt.Printf("ID of Peter J. Gentry is %v\n", id)
+
+	// id, err = personId(db, "Karen H. Jobes")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// fmt.Printf("ID of Karen H. Jobes is %v\n", id)
 }

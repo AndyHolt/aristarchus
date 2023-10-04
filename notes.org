@@ -2,6 +2,13 @@
 - [X] Set up SQLite database
 - [ ] Create Go app to provide abilities to add, modify, view and delete books
   from library (manually) -- CRUD
+- [ ] Use prepared statements for database interaction where possible, to speed
+  up a little. See [[https://go.dev/doc/database/prepared-statements][Using prepared statements]].
+- [ ] Parallelism database lookup for speed, using Go routines (check how much
+  it actually speeds up looking up a couple of hundred/thousand books, a good
+  point to be raised in "Building Aristarchus" blog post). Would it be faster to
+  just get all the rows from the database in one big move, then process them
+  (parallelly?) in Go?
 - [ ] Search interface
 - [ ] Add books by ISBN or title/author and automatically fetch data
 - [ ] Provide API for dealing with data in JSON
