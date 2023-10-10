@@ -193,7 +193,7 @@ func getAuthorsListById(db *sql.DB, id int) ([]string, error) {
             ON book_author.author_id = people.person_id
           WHERE book_author.book_id = ?`
 	authorRows, err := db.Query(sqlStmt, id)
-	// I think we need to handle no rows case as meaning no authors, not an error!
+	// [review] I think we need to handle no rows case as meaning no authors, not an error!
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return authors, fmt.Errorf("getAuthorsListById %d: No such book", id)
@@ -244,7 +244,6 @@ func getBookById(db *sql.DB, id int) (Book, error) {
 	var b Book
 	b.id = id
 
-	// [todo] need to handle purchased date
 	var subtitle sql.NullString
 	var seriesName sql.NullString
 	var edition sql.NullInt64
@@ -387,11 +386,79 @@ func seriesId(db *sql.DB, series string) (int, error) {
 	return id, nil
 }
 
+type AddingDuplicateBookError struct {
+	book *Book
+	id   int
+}
+
+func (e *AddingDuplicateBookError) Error() string {
+	return fmt.Sprintf("Book \"%v\" already in database, id #%v",
+		e.book.title,
+		e.id)
+}
+
+func checkBookInDb(db *sql.DB, b *Book) (int, error) {
+	// [todo] update checkBookInDb to use isbn, if available.
+
+	var id int
+	var authorList, editorList []string
+	var authorForCheck, editorForCheck string
+
+	authorList = nameListFromString(b.author)
+	if len(authorList) != 0 {
+		authorForCheck = authorList[0]
+	}
+
+	editorList = nameListFromString(b.editor)
+	if len(editorList) != 0 {
+		editorForCheck = editorList[0]
+	}
+
+	sqlStmt := `
+        SELECT books.book_id
+        FROM books
+        INNER JOIN book_author
+          ON books.book_id = book_author.book_id
+        INNER JOIN people
+          ON book_author.author_id = people.person_id
+        WHERE people.name = ?
+          AND books.title = ?
+        UNION
+        SELECT books.book_id
+        FROM books
+        INNER JOIN book_editor
+          ON books.book_id = book_editor.book_id
+        INNER JOIN people
+          ON book_editor.editor_id = people.person_id
+        WHERE people.name = ?
+          AND books.title = ?
+`
+
+	if scanErr := db.QueryRow(sqlStmt,
+		authorForCheck,
+		b.title,
+		editorForCheck,
+		b.title).Scan(&id); scanErr != nil {
+		if scanErr == sql.ErrNoRows {
+			return 0, nil
+		} else {
+			return 0, fmt.Errorf("checkBookInDb, SQL scan error, %v", scanErr)
+		}
+	} else {
+		return id, &AddingDuplicateBookError{b, id}
+	}
+}
+
 func addBook(db *sql.DB, b *Book) (int, error) {
-	// [todo] - check that book isn't already in database
-	// Write a function which handles checking, using ISBN if available, else
-	// combination of author/editors, title and edition. Return id with an error
-	// if book is in library, otherwise, return 0 and nil error.
+	// check if book is already in database
+	id, bookInDbErr := checkBookInDb(db, b)
+	if bookInDbErr != nil {
+		if _, ok := bookInDbErr.(*AddingDuplicateBookError); ok {
+			return id, bookInDbErr
+		} else {
+			return id, fmt.Errorf("addBook, %v", bookInDbErr)
+		}
+	}
 
 	// handle people
 	var authorList, editorList []string
@@ -570,22 +637,21 @@ func main() {
 	ittspd.setDate("December 2021")
 	itts.purchased = ittspd
 
-	// [fix] addBook not working! Doesn't add a book. Possibly an issue with
-	// adding an extra blank named person too? Why isn't the book added? Is
-	// there an issue with performing the transaction? But no errors appear to
-	// be raised?
-
-	// id, err := addBook(db, &itts)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	// fmt.Printf("Added new book with id %v\n", id)
-	// volumes, err = countAllBooks(db)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// fmt.Printf("Now there are %v books in library:\n", volumes)
+	id, err := addBook(db, &itts)
+	if err != nil {
+		if _, ok := err.(*AddingDuplicateBookError); ok {
+			fmt.Println(err)
+		} else {
+			log.Fatal(err)
+		}
+	} else {
+		fmt.Printf("Added new book with id %v\n", id)
+	}
+	volumes, err = countAllBooks(db)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Now there are %v books in library:\n", volumes)
 
 	// var gpe Book
 	// gpe.editor = "Chad Meister and James K. Dew Jr."
