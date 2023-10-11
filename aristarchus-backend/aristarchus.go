@@ -102,7 +102,13 @@ func (b Book) fullTitle() string {
 	}
 }
 
-func countAllBooks(db *sql.DB) (int, error) {
+type DBInterface interface {
+	Exec(query string, args ...any) (sql.Result, error)
+	Query(query string, args ...any) (*sql.Rows, error)
+	QueryRow(query string, args ...any) *sql.Row
+}
+
+func countAllBooks(db DBInterface) (int, error) {
 	var bookCount int
 	err := db.QueryRow("SELECT COUNT(book_id) FROM books").Scan(&bookCount)
 	if err != nil {
@@ -111,7 +117,7 @@ func countAllBooks(db *sql.DB) (int, error) {
 	return bookCount, nil
 }
 
-func countBooksByStatus(db *sql.DB, status string) (int, error) {
+func countBooksByStatus(db DBInterface, status string) (int, error) {
 	var bookCount int
 	err := db.QueryRow("SELECT COUNT(book_id) FROM books WHERE status = ?",
 		status).Scan(&bookCount)
@@ -121,7 +127,7 @@ func countBooksByStatus(db *sql.DB, status string) (int, error) {
 	return bookCount, nil
 }
 
-func getListOfBookIDs(db *sql.DB) ([]int, error) {
+func getListOfBookIDs(db DBInterface) ([]int, error) {
 	var idList []int
 	rows, err := db.Query("SELECT book_id FROM books ORDER BY book_id")
 	if err != nil {
@@ -184,7 +190,7 @@ func nameListFromString(nameString string) []string {
 	return nameList
 }
 
-func getAuthorsListById(db *sql.DB, id int) ([]string, error) {
+func getAuthorsListById(db DBInterface, id int) ([]string, error) {
 	var authors []string
 	sqlStmt := `
           SELECT people.name
@@ -212,7 +218,7 @@ func getAuthorsListById(db *sql.DB, id int) ([]string, error) {
 	return authors, nil
 }
 
-func getEditorsListById(db *sql.DB, id int) ([]string, error) {
+func getEditorsListById(db DBInterface, id int) ([]string, error) {
 	var editors []string
 	sqlStmt := `
           SELECT people.name
@@ -240,7 +246,7 @@ func getEditorsListById(db *sql.DB, id int) ([]string, error) {
 	return editors, nil
 }
 
-func getBookById(db *sql.DB, id int) (Book, error) {
+func getBookById(db DBInterface, id int) (Book, error) {
 	var b Book
 	b.id = id
 
@@ -297,7 +303,7 @@ func getBookById(db *sql.DB, id int) (Book, error) {
 	return b, nil
 }
 
-func printBookList(db *sql.DB) ([]Book, error) {
+func printBookList(db DBInterface) ([]Book, error) {
 	idList, err := getListOfBookIDs(db)
 	if err != nil {
 		return nil, err
@@ -321,7 +327,7 @@ func printBookList(db *sql.DB) ([]Book, error) {
 	return bookList, nil
 }
 
-func personId(db *sql.DB, person string) (int, error) {
+func personId(db DBInterface, person string) (int, error) {
 	var id int
 	if err := db.QueryRow("SELECT person_id FROM people WHERE name = ?",
 		person).Scan(&id); err != nil {
@@ -342,7 +348,7 @@ func personId(db *sql.DB, person string) (int, error) {
 	return id, nil
 }
 
-func publisherId(db *sql.DB, publisher string) (int, error) {
+func publisherId(db DBInterface, publisher string) (int, error) {
 	var id int
 	if err := db.QueryRow("SELECT publisher_id FROM publishers WHERE name = ?",
 		publisher).Scan(&id); err != nil {
@@ -364,7 +370,7 @@ func publisherId(db *sql.DB, publisher string) (int, error) {
 	return id, nil
 }
 
-func seriesId(db *sql.DB, series string) (int, error) {
+func seriesId(db DBInterface, series string) (int, error) {
 	var id int
 	if err := db.QueryRow("SELECT series_id FROM series WHERE series_name = ?",
 		series).Scan(&id); err != nil {
@@ -397,7 +403,7 @@ func (e *AddingDuplicateBookError) Error() string {
 		e.id)
 }
 
-func checkBookInDb(db *sql.DB, b *Book) (int, error) {
+func checkBookInDb(db DBInterface, b *Book) (int, error) {
 	// [todo] update checkBookInDb to use isbn, if available.
 
 	var id int
