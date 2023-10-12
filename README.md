@@ -1,4 +1,4 @@
-# Aristarchus, the library manager
+# Aristarchus, the library 📚 manager
 
 Named after Ἀρίσταρχος ὁ Σαμόθραξ, head librarian of the Library of Alexandria
 c. 153--145 BC.
