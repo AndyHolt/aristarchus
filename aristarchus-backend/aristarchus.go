@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"slices"
 	"strings"
 	"time"
 
@@ -573,6 +574,192 @@ func addBook(db *sql.DB, b *Book) (int, error) {
 	return bookId, nil
 }
 
+func updateBookAuthor(db *sql.DB, id int, authorString string) (string, error) {
+	newAuthorsList := nameListFromString(authorString)
+	oldAuthorsList, err := getAuthorsListById(db, id)
+	if err != nil {
+		return "", err
+	}
+
+	var authorsToAdd, authorsToDelete []string
+
+	for _, author := range newAuthorsList {
+		if !slices.Contains(oldAuthorsList, author) {
+			authorsToAdd = append(authorsToAdd, author)
+		}
+	}
+
+	for _, author := range oldAuthorsList {
+		if !slices.Contains(newAuthorsList, author) {
+			authorsToDelete = append(authorsToDelete, author)
+		}
+	}
+
+	// start a transaction to make the edit of authors atomic
+	tx, err := db.Begin()
+	if err != nil {
+		return "", fmt.Errorf("updateBookAuthor, Couldn't start sql transaction: %v", err)
+	}
+	defer tx.Rollback()
+
+	for _, author := range authorsToAdd {
+		personId, personIdErr := personId(tx, author)
+		if personIdErr != nil {
+			return "", fmt.Errorf("updateBookAuthor: %v", personIdErr)
+		}
+
+		_, err := tx.Exec("INSERT INTO book_author (book_id, author_id) VALUES (?, ?)",
+			id, personId)
+		if err != nil {
+			return "", fmt.Errorf("updateBookAuthor: %v", err)
+		}
+	}
+
+	for _, author := range authorsToDelete {
+		personId, personIdErr := personId(tx, author)
+		if personIdErr != nil {
+			return "", fmt.Errorf("updateBookAuthor:, %v", personIdErr)
+		}
+
+		_, err := tx.Exec("DELETE FROM book_author WHERE book_id = ? AND author_id = ?",
+			id, personId)
+		if err != nil {
+			return "", fmt.Errorf("updateBookAuthor: %v, err")
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return "", fmt.Errorf("updateBookAuthor, issue updating authors: %v", err)
+	}
+
+	updatedAuthorList, err := getAuthorsListById(db, id)
+	if err != nil {
+		return "", fmt.Errorf("updateBookAuthor, Couldn't fetch updated authors: %v", err)
+	}
+	updatedAuthor := formatNameList(updatedAuthorList)
+
+	return updatedAuthor, nil
+}
+
+func updateBookEditor(db *sql.DB, id int, editorString string) (string, error) {
+	newEditorsList := nameListFromString(editorString)
+	oldEditorsList, err := getEditorsListById(db, id)
+	if err != nil {
+		return "", err
+	}
+
+	var editorsToAdd, editorsToDelete []string
+
+	for _, editor := range newEditorsList {
+		if !slices.Contains(oldEditorsList, editor) {
+			editorsToAdd = append(editorsToAdd, editor)
+		}
+	}
+
+	for _, editor := range oldEditorsList {
+		if !slices.Contains(newEditorsList, editor) {
+			editorsToDelete = append(editorsToDelete, editor)
+		}
+	}
+
+	// start a transaction to make the edit of authors atomic
+	tx, err := db.Begin()
+	if err != nil {
+		return "", fmt.Errorf("updateBookEditor, Couldn't start sql transaction: %v", err)
+	}
+	defer tx.Rollback()
+
+	for _, editor := range editorsToAdd {
+		personId, personIdErr := personId(tx, editor)
+		if personIdErr != nil {
+			return "", fmt.Errorf("updateBookEditor: %v", personIdErr)
+		}
+
+		_, err := tx.Exec("INSERT INTO book_editor (book_id, editor_id) VALUES (?, ?)",
+			id, personId)
+		if err != nil {
+			return "", fmt.Errorf("updateBookEditor: %v", err)
+		}
+	}
+
+	for _, editor := range editorsToDelete {
+		personId, personIdErr := personId(tx, editor)
+		if personIdErr != nil {
+			return "", fmt.Errorf("updateBookEditor:, %v", personIdErr)
+		}
+
+		_, err := tx.Exec("DELETE FROM book_editor WHERE book_id = ? AND editor_id = ?",
+			id, personId)
+		if err != nil {
+			return "", fmt.Errorf("updateBookEditor: %v, err")
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return "", fmt.Errorf("updateBookEditor, issue updating editors: %v", err)
+	}
+
+	updatedEditorList, err := getEditorsListById(db, id)
+	if err != nil {
+		return "", fmt.Errorf("updateBookEditor, Couldn't fetch updated editors: %v", err)
+	}
+	updatedEditor := formatNameList(updatedEditorList)
+
+	return updatedEditor, nil
+}
+
+func updatePersonName(db DBInterface, id int, newName string) (string, error) {
+	sqlStmt := `
+      UPDATE people
+      SET name = ?
+      WHERE person_id = ?
+      `
+
+	_, err := db.Exec(sqlStmt, newName, id)
+	if err != nil {
+		return "", fmt.Errorf("updatePersonName, Couldn't update person #%v to %v: %v",
+			id, newName, err)
+	}
+
+	var updatedName string
+	if err := db.QueryRow("SELECT name FROM people WHERE person_id = ?",
+		id).Scan(&updatedName); err != nil {
+		return "", fmt.Errorf("updatePersonName, Couldn't get updated name: %v", err)
+	}
+	if updatedName != newName {
+		return "", fmt.Errorf("updatePersonName, Updated name \"%v\" is not desired new name \"%v\".")
+	}
+
+	return updatedName, nil
+}
+
+func updateBookTitle(db DBInterface, id int, title string) (string, error) {
+	sqlStmt := `
+      UPDATE books
+      SET title = ?
+      WHERE book_id = ?
+      `
+
+	_, err := db.Exec(sqlStmt, title, id)
+	if err != nil {
+		return "", fmt.Errorf("updateBookTitle, Couldn't update book #%v title to %v: %v",
+			id, title, err)
+	}
+
+	var updatedTitle string
+	if err := db.QueryRow("SELECT title FROM books WHERE book_id = ?",
+		id).Scan(&updatedTitle); err != nil {
+		return "", fmt.Errorf("updateBookTitle, Couldn't get updated title: %v", err)
+	}
+	if updatedTitle != title {
+		return "", fmt.Errorf("updateBookTitle: Updated title \"%v\" does not match requested title \"%v\"")
+	}
+
+	return updatedTitle, nil
+}
+
 func main() {
 	// set up database connection
 	db, err := sql.Open("sqlite3", "../db/books.sqlite")
@@ -725,4 +912,144 @@ func main() {
 	// 	log.Fatal(err)
 	// }
 	// fmt.Printf("ID of Karen H. Jobes is %v\n", id)
+
+	// [todo] Add functions to edit each attribute of the book
+	//   [done] Modify author(s) of a book function
+	fmt.Printf("\n*** Testing modification of book author ***\n")
+	newAuthors, err := updateBookAuthor(db, 7, "P. G. Wodehouse, J. K. Rowling and Timothy Keller")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Authors of \"Invitation to the Septuagint\" are now %v\n",
+		newAuthors)
+
+	newAuthors, err = updateBookAuthor(db, 7, "Karen H. Jobes and Moisés Silva")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Authors of \"Invitation to the Septuagint\" are now %v\n",
+		newAuthors)
+
+	//   [done] Modify editor(s) of a book function
+	fmt.Printf("\n*** Testing modification of book editor ***\n")
+	newEditors, err := updateBookEditor(db, 7, "Anselm and P. G. Wodehouse")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Editors of \"Invitation to the Septuagint\" are now %v\n",
+		newEditors)
+
+	newEditors, err = updateBookEditor(db, 7, "")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Editors of \"Invitation to the Septuagint\" are now %v\n",
+		newEditors)
+
+	//   [done] Modify a person's name function
+	fmt.Printf("\n*** Testing modification of person's name ***\n")
+	booksByAuthorIdSql := `
+      SELECT author_id, name, title
+      FROM books
+      INNER JOIN book_author
+        ON books.book_id = book_author.book_id
+      INNER JOIN people
+        ON book_author.author_id = people.person_id
+      WHERE author_id = ?
+      `
+
+	rows, err := db.Query(booksByAuthorIdSql, 3)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+	fmt.Printf("Books by author with person_id #3:\n")
+	for rows.Next() {
+		var authorId int
+		var authorName string
+		var bookTitle string
+		if scanErr := rows.Scan(&authorId, &authorName, &bookTitle); scanErr != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("person_id: %v, name: %v, book title: %v\n", authorId,
+			authorName, bookTitle)
+	}
+
+	updatePersonName(db, 3, "Geoffrey Parker Jr.")
+
+	rows, err = db.Query(booksByAuthorIdSql, 3)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+	fmt.Printf("Books by author with person_id #3:\n")
+	for rows.Next() {
+		var authorId int
+		var authorName string
+		var bookTitle string
+		if scanErr := rows.Scan(&authorId, &authorName, &bookTitle); scanErr != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("person_id: %v, name: %v, book title: %v\n", authorId,
+			authorName, bookTitle)
+	}
+
+	updatePersonName(db, 3, "Peter J. Gentry")
+
+	rows, err = db.Query(booksByAuthorIdSql, 3)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+	fmt.Printf("Books by author with person_id #3:\n")
+	for rows.Next() {
+		var authorId int
+		var authorName string
+		var bookTitle string
+		if scanErr := rows.Scan(&authorId, &authorName, &bookTitle); scanErr != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("person_id: %v, name: %v, book title: %v\n", authorId,
+			authorName, bookTitle)
+	}
+
+	//   [done] Modify title function
+	fmt.Printf("\n*** Testing modification of book title ***\n")
+
+	var aBook Book
+	aBook, err = getBookById(db, 1)
+	fmt.Printf("Prior to modification, book #1 is: %v\n", aBook)
+
+	newTitle, err := updateBookTitle(db, 1, "The Art of Old Testament Studies")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Book title changed to \"%v\"\n", newTitle)
+	aBook, err = getBookById(db, 1)
+	fmt.Printf("After modification, book #1 is: %v\n", aBook)
+
+	newTitle, err = updateBookTitle(db, 1, "Introduction to the Old Testament")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Book title changed back to \"%v\"\n", newTitle)
+	aBook, err = getBookById(db, 1)
+	fmt.Printf("After re-modification, book #1 is: %v\n", aBook)
+
+	//   [todo] Modify subtitle function
+	//   [todo] Modify year function
+	//   [todo] Modify edition function
+	//   [todo] Modify publisher function
+	//   [todo] Modify publisher name function
+	//   [todo] Modify isbn function
+	//   [todo] Modify series function
+	//   [todo] Modify series name function
+	//   [todo] Modify status function
+	//   [todo] Modify purchased function
+
+	// [todo] Add functions to delete from database
+	//   [todo] Delete book by ID function
+	//   [todo] Delete person by ID function
+	//   [todo] Delete publisher by ID function
+	//   [todo] Delete series by ID function
 }
