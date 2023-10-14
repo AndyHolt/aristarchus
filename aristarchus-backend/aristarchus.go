@@ -761,6 +761,29 @@ func updateBookTitle(db DBInterface, id int, title string) (string, error) {
 	return updatedTitle, nil
 }
 
+func updateBookSubtitle(db DBInterface, id int, subtitle string) (string, error) {
+    sqlStmt := `
+      UPDATE books
+      SET subtitle = ?
+      WHERE book_id = ?
+    `
+
+	_, err := db.Exec(sqlStmt, subtitle, id)
+	if err != nil {
+		return "", fmt.Errorf("updateBookSubtitle, Couldn't update book #%v subtitle to %v: %v",
+		  id, subtitle, err)
+	}
+
+	var updatedSubtitle string
+	if err := db.QueryRow("SELECT subtitle FROM books WHERE book_id = ?",
+		id).Scan(&updatedSubtitle); err != nil {
+			return "", fmt.Errorf("updatedBookSubtitle: Updated subtitle \"%v\" does not match requested subtitle \"%v\"",
+				updatedSubtitle, subtitle)
+		}
+
+	return updatedSubtitle, nil
+}
+
 func main() {
 	// set up database connection
 	db, err := sql.Open("sqlite3", "../db/books.sqlite")
@@ -1038,6 +1061,35 @@ func main() {
 	fmt.Printf("After re-modification, book #1 is: %v\n", aBook)
 
 	//   [todo] Modify subtitle function
+	fmt.Printf("\n*** Testing modification of subtitle***\n")
+
+	var bid int
+	var title, subtitle string
+	sqlStmt := `
+        SELECT book_id, title, subtitle
+        FROM books
+        WHERE book_id = ?
+        `
+	if err = db.QueryRow(sqlStmt, 2).Scan(&bid, &title, &subtitle); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Book id #%v has title \"%v\" and subtitle \"%v\"\n", bid, title, subtitle)
+
+	_, err = updateBookSubtitle(db, 2, "Four Views, at least three of them wrong")
+
+	if err = db.QueryRow(sqlStmt, 2).Scan(&bid, &title, &subtitle); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("After modification, subtitle is \"%v\"\n", subtitle)
+
+	newSubtitle, err := updateBookSubtitle(db, 2, "Four Views of God's Emotions and Suffering")
+
+	if err = db.QueryRow(sqlStmt, 2).Scan(&bid, &title, &subtitle); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("After reversion, subtitle is \"%v\"\n", subtitle)
+	fmt.Printf("Returned value was %v\n", newSubtitle)
+
 	//   [todo] Modify year function
 	//   [todo] Modify edition function
 	//   [todo] Modify publisher function
