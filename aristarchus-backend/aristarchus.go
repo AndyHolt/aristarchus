@@ -754,7 +754,8 @@ func updateBookTitle(db DBInterface, id int, title string) (string, error) {
 		return "", fmt.Errorf("updateBookTitle, Couldn't get updated title: %v", err)
 	}
 	if updatedTitle != title {
-		return "", fmt.Errorf("updateBookTitle: Updated title \"%v\" does not match requested title \"%v\"")
+		return "", fmt.Errorf("updateBookTitle: Updated title \"%v\" does not match requested title \"%v\"",
+			updatedTitle, title)
 	}
 
 	return updatedTitle, nil
