@@ -228,6 +228,7 @@ func getEditorsListById(db DBInterface, id int) ([]string, error) {
             ON book_editor.editor_id = people.person_id
           WHERE book_editor.book_id = ?`
 	editorRows, err := db.Query(sqlStmt, id)
+	// [review] I think we need to handle no rows case as meaning no editors, not an error!
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return editors, fmt.Errorf("getEditorsListById %d: No such book", id)
@@ -1082,7 +1083,7 @@ func main() {
 	aBook, err = getBookById(db, 1)
 	fmt.Printf("After re-modification, book #1 is: %v\n", aBook)
 
-	//   [todo] Modify subtitle function
+	//   [done] Modify subtitle function (allow null values with sql.NullString)
 	fmt.Printf("\n*** Testing modification of subtitle***\n")
 
 	var bid int
