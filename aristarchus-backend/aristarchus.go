@@ -1112,6 +1112,12 @@ func main() {
 	fmt.Printf("After reversion, subtitle is \"%v\"\n", subtitle)
 	fmt.Printf("Returned value was %v\n", newSubtitle)
 
+	newSubtitle, err = updateBookSubtitle(db, 7, "")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	newSubtitle, err = updateBookSubtitle(db, 1, "")
 	//   [todo] Modify year function
 	//   [todo] Modify edition function
 	//   [todo] Modify publisher function
