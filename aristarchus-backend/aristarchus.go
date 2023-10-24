@@ -807,6 +807,30 @@ func updateBookSubtitle(db DBInterface, id int, subtitle string) (string, error)
 	return updatedSubtitle.String, nil
 }
 
+func updateBookYear(db DBInterface, id int, year int) (int, error) {
+	sqlStmt := `
+        UPDATE books
+        SET year = ?
+        WHERE book_id = ?
+    `
+
+	_, err := db.Exec(sqlStmt, year, id)
+	if err != nil {
+		return 0, fmt.Errorf("updateBookYear, Couldn't update book %v year to %v: %v", id, year, err)
+	}
+
+	var updatedYear int
+	if err := db.QueryRow("SELECT year FROM books WHERE book_id = ?",
+		id).Scan(&updatedYear); err != nil {
+		return 0, fmt.Errorf("updateBookYear, Couldn't retrieve updated year value: %v", err)
+	}
+	if updatedYear != year {
+		return 0, fmt.Errorf("updateBookYear, Updated year %v is not the required year %v", updatedYear, year)
+	}
+
+	return updatedYear, nil
+}
+
 func main() {
 	// set up database connection
 	db, err := sql.Open("sqlite3", "../db/books.sqlite")
@@ -1120,8 +1144,34 @@ func main() {
 
 	newSubtitle, err = updateBookSubtitle(db, 1, "")
 
-	//   [todo] Modify year function
-	// fmt.Printf("\n*** Testing modification of year***\n")
+	//   [done] Modify year function
+	fmt.Printf("\n*** Testing modification of year***\n")
+
+	var year int
+	sqlStmt = `
+        SELECT book_id, title, year
+        FROM books
+        WHERE book_id = ?
+    `
+
+	if err = db.QueryRow(sqlStmt, 1).Scan(&bid, &title, &year); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Book id #%v, \"%v\" was published in %v\n", bid, title, year)
+
+	_, err = updateBookYear(db, 1, 2023)
+
+	if err = db.QueryRow(sqlStmt, 1).Scan(&bid, &title, &year); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("After modification, publication year is %v\n", year)
+
+	_, err = updateBookYear(db, 1, 1969)
+
+	if err = db.QueryRow(sqlStmt, 1).Scan(&bid, &title, &year); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("After reversion, publication year is %v\n", year)
 
 	//   [todo] Modify edition function (allow null value with sql.NullInt64)
 	//   [todo] Modify publisher function
