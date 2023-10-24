@@ -832,6 +832,8 @@ func updateBookYear(db DBInterface, id int, year int) (int, error) {
 }
 
 func main() {
+	// [todo] Replace most of main function with proper unit tests
+
 	// set up database connection
 	db, err := sql.Open("sqlite3", "../db/books.sqlite")
 	if err != nil {
