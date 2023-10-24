@@ -496,14 +496,43 @@ func addBook(db *sql.DB, b *Book) (int, error) {
 	}
 
 	// handle series
-	var serId int
-	if len(b.series) != 0 {
-		serId, err = seriesId(db, b.series)
+	var serId sql.NullInt64
+	if len(b.series) == 0 {
+		serId.Valid = false
+	} else {
+		serId.Valid = true
+		seriesId, err := seriesId(db, b.series)
 		if err != nil {
 			return 0, fmt.Errorf("addBook, issue with series, %v", err)
 		}
+		serId.Int64 = int64(seriesId)
+	}
+
+	// use potential null values for other nullable columns: subtitle, edition
+	// and purchased_date
+
+	var subtitle sql.NullString
+	if len(b.subtitle) == 0 {
+		subtitle.Valid = false
 	} else {
-		serId = -1
+		subtitle.Valid = true
+		subtitle.String = b.subtitle
+	}
+
+	var edition sql.NullInt64
+	if b.edition == 0 {
+		edition.Valid = false
+	} else {
+		edition.Valid = true
+		edition.Int64 = int64(b.edition)
+	}
+
+	var purDate sql.NullString
+	if len(b.purchased.String()) == 0 {
+		purDate.Valid = false
+	} else {
+		purDate.Valid = true
+		purDate.String = b.purchased.String()
 	}
 
 	// insert book -- at this point, use a transaction to ensure author/editor
@@ -515,39 +544,20 @@ func addBook(db *sql.DB, b *Book) (int, error) {
 	defer tx.Rollback()
 
 	var bookId int
-
-	if serId != -1 {
-		result, err := tx.Exec(`INSERT INTO books (title, subtitle, year, edition,
+	result, err := tx.Exec(`INSERT INTO books (title, subtitle, year, edition,
                             publisher_id, isbn, series_id, status,
                             purchased_date) VALUES (?, ?, ?, ?, ?, ?, ?,
                             ?, ?)`,
-			b.title, b.subtitle, b.year, b.edition, pubId, b.isbn,
-			serId, b.status, b.purchased.String())
-
-		if err != nil {
-			return 0, fmt.Errorf("addBook: %v", err)
-		}
-		liid, err := result.LastInsertId()
-		if err != nil {
-			return 0, fmt.Errorf("addBook: %v", err)
-		}
-		bookId = int(liid)
-	} else {
-		result, err := tx.Exec(`INSERT INTO books (title, subtitle, year, edition,
-                            publisher_id, isbn, status, purchased_date) VALUES
-			                (?, ?, ?, ?, ?, ?, ?, ?)`,
-			b.title, b.subtitle, b.year, b.edition, pubId, b.isbn,
-			b.status, b.purchased.String())
-
-		if err != nil {
-			return 0, fmt.Errorf("addBook: %v", err)
-		}
-		liid, err := result.LastInsertId()
-		if err != nil {
-			return 0, fmt.Errorf("addBook: %v", err)
-		}
-		bookId = int(liid)
+		b.title, subtitle, b.year, edition, pubId, b.isbn, serId, b.status,
+		purDate)
+	if err != nil {
+		return 0, fmt.Errorf("addBook: %v", err)
 	}
+	liid, err := result.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("addBook: %v", err)
+	}
+	bookId = int(liid)
 
 	// handle book_author
 	for _, authId := range authorIdList {
