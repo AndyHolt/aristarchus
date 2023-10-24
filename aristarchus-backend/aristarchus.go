@@ -762,26 +762,38 @@ func updateBookTitle(db DBInterface, id int, title string) (string, error) {
 }
 
 func updateBookSubtitle(db DBInterface, id int, subtitle string) (string, error) {
-    sqlStmt := `
+	var bookSubtitle sql.NullString
+	if len(subtitle) != 0 {
+		bookSubtitle.Valid = true
+		bookSubtitle.String = subtitle
+	} else {
+		bookSubtitle.Valid = false
+	}
+
+	sqlStmt := `
       UPDATE books
       SET subtitle = ?
       WHERE book_id = ?
     `
 
-	_, err := db.Exec(sqlStmt, subtitle, id)
+	_, err := db.Exec(sqlStmt, bookSubtitle, id)
 	if err != nil {
 		return "", fmt.Errorf("updateBookSubtitle, Couldn't update book #%v subtitle to %v: %v",
-		  id, subtitle, err)
+			id, bookSubtitle, err)
 	}
 
-	var updatedSubtitle string
+	var updatedSubtitle sql.NullString
 	if err := db.QueryRow("SELECT subtitle FROM books WHERE book_id = ?",
 		id).Scan(&updatedSubtitle); err != nil {
-			return "", fmt.Errorf("updatedBookSubtitle: Updated subtitle \"%v\" does not match requested subtitle \"%v\"",
-				updatedSubtitle, subtitle)
-		}
+		return "", fmt.Errorf("updateBookSubtitle: Couldn't get subtitle for book #%v\n", id)
+	}
 
-	return updatedSubtitle, nil
+	if updatedSubtitle != bookSubtitle {
+		return "", fmt.Errorf("updateBookSubtitle: Updated subtitle \"%v\" does not match requested subtitle \"%v\"",
+			updatedSubtitle, bookSubtitle)
+	}
+
+	return updatedSubtitle.String, nil
 }
 
 func main() {
