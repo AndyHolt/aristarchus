@@ -1118,15 +1118,18 @@ func main() {
 	}
 
 	newSubtitle, err = updateBookSubtitle(db, 1, "")
+
 	//   [todo] Modify year function
-	//   [todo] Modify edition function
+	// fmt.Printf("\n*** Testing modification of year***\n")
+
+	//   [todo] Modify edition function (allow null value with sql.NullInt64)
 	//   [todo] Modify publisher function
 	//   [todo] Modify publisher name function
 	//   [todo] Modify isbn function
-	//   [todo] Modify series function
-	//   [todo] Modify series name function
+	//   [todo] Modify series function (allow Null values with sql.NullString)
+	//   [todo] Modify series name function (does not allow null values)
 	//   [todo] Modify status function
-	//   [todo] Modify purchased function
+	//   [todo] Modify purchased function (allow null values with sql.NullString)
 
 	// [todo] Add functions to delete from database
 	//   [todo] Delete book by ID function
