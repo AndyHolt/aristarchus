@@ -863,6 +863,71 @@ func updateBookEdition(db DBInterface, id int, edition int) (int, error) {
 
 	return int(updatedEdition.Int64), nil
 }
+
+func updateBookPublisherById(db DBInterface, id int, publisher int) (int, error) {
+	sqlStmt := `
+        UPDATE books
+        SET publisher_id = ?
+        WHERE book_id = ?
+    `
+	_, err := db.Exec(sqlStmt, publisher, id)
+	if err != nil {
+		return 0, fmt.Errorf("updateBookPublisherById, Couldn't update book #%v to have publisher id #%v: %v",
+			id, publisher, err)
+	}
+
+	var updatedPublisher int
+	if err := db.QueryRow("SELECT publisher_id FROM books WHERE id = ?",
+		id).Scan(&updatedPublisher); err != nil {
+		return 0, fmt.Errorf("updatedBookPublisherById, Couldn't retrieve updated publisher, %v", err)
+	}
+
+	if updatedPublisher != publisher {
+		return 0, fmt.Errorf("updatedBookPublisherById, Updated publisher id #%v does not match requested id of %v.", updatedPublisher, publisher)
+	}
+
+	return updatedPublisher, nil
+}
+
+func updateBookPublisherByName(db DBInterface, id int, publisher string) (string, error) {
+	sqlStmt := `
+        UPDATE books
+        SET publisher_id = ?
+        WHERE book_id = ?
+    `
+
+	pubId, err := publisherId(db, publisher)
+	if err != nil {
+		return "", fmt.Errorf("updateBookPublisherByName, Couldn't get id for publisher %v: %v",
+		    publisher, err)
+	}
+
+	_, err = db.Exec(sqlStmt, pubId, id)
+	if err != nil {
+		return "", fmt.Errorf("updateBookPublisherByName, Couldn't update book #%v to have publisher %v (id #%v): %v",
+			id, publisher, pubId, err)
+	}
+
+	var updatedPublisher string
+	sqlCheckStmt := `
+        SELECT name
+        FROM books
+        INNER JOIN publishers
+          ON books.publisher_id = publishers.publisher_id
+        WHERE book_id = ?
+    `
+
+	if err := db.QueryRow(sqlCheckStmt, id).Scan(&updatedPublisher); err != nil {
+		return "", fmt.Errorf("updatedBookPublisherByName, Couldn't retrieve updated publisher, %v", err)
+	}
+
+	if updatedPublisher != publisher {
+		return "", fmt.Errorf("updatedBookPublisherByName, Updated publisher %v does not match requested publisher %v.", updatedPublisher, publisher)
+	}
+
+	return updatedPublisher, nil
+}
+
 func main() {
 	// [todo] Replace most of main function with proper unit tests
 
@@ -1207,7 +1272,6 @@ func main() {
 	}
 	fmt.Printf("After reversion, publication year is %v\n", year)
 
-	//   [todo] Modify publisher function
 	//   [done] Modify edition function (allow null value with sql.NullInt64)
 	fmt.Printf("\n*** Testing modification of edition***\n")
 
@@ -1236,6 +1300,68 @@ func main() {
 		log.Fatal(err)
 	}
 	fmt.Printf("After reversion, edition is %v\n", edition)
+
+	//   [done] Modify book publisher by id function
+	fmt.Printf("\n*** Testing modification of publisher by id ***\n")
+
+	var pubId int
+	var pubName string
+	sqlStmt = `
+        SELECT book_id, title, books.publisher_id, name
+        FROM books
+        INNER JOIN publishers
+          ON books.publisher_id = publishers.publisher_id
+        WHERE book_id = ?
+    `
+	if err = db.QueryRow(sqlStmt, 1).Scan(&bid, &title, &pubId, &pubName); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Book #%v, \"%v\" is published by publisher #%v, %v\n", bid, title,
+		pubId, pubName)
+
+	_, err = updateBookPublisherById(db, 1, 2)
+
+	if err = db.QueryRow(sqlStmt, 1).Scan(&bid, &title, &pubId, &pubName); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("After modification, published by publisher #%v, %v\n", pubId, pubName)
+
+	_, err = updateBookPublisherById(db, 1, 1)
+
+	if err = db.QueryRow(sqlStmt, 1).Scan(&bid, &title, &pubId, &pubName); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("After reversion, published by publisher #%v, %v\n", pubId, pubName)
+
+	//   [done] Modify book publisher by publisher name
+	fmt.Printf("\n*** Testing modification of publisher by name ***\n")
+
+	sqlStmt = `
+        SELECT book_id, title, books.publisher_id, name
+        FROM books
+        INNER JOIN publishers
+          ON books.publisher_id = publishers.publisher_id
+        WHERE book_id = ?
+    `
+	if err = db.QueryRow(sqlStmt, 1).Scan(&bid, &title, &pubId, &pubName); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Book #%v, \"%v\" is published by publisher #%v, %v\n", bid, title,
+		pubId, pubName)
+
+	_, err = updateBookPublisherByName(db, 1, "Crossway")
+
+	if err = db.QueryRow(sqlStmt, 1).Scan(&bid, &title, &pubId, &pubName); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("After modification, published by publisher #%v, %v\n", pubId, pubName)
+
+	_, err = updateBookPublisherByName(db, 1, "IVP")
+
+	if err = db.QueryRow(sqlStmt, 1).Scan(&bid, &title, &pubId, &pubName); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("After reversion, published by publisher #%v, %v\n", pubId, pubName)
 
 	//   [todo] Modify publisher name function
 	//   [todo] Modify isbn function
