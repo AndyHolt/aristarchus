@@ -1417,8 +1417,28 @@ func main() {
 	}
 	fmt.Printf("After reversion, published by publisher #%v, %v\n", pubId, pubName)
 
-	//   [todo] Modify publisher name function
 	//   [todo] Modify isbn function
+	//   [done] Modify publisher name function
+	fmt.Printf("\n*** Testing modification of publisher name ***\n")
+	if err = db.QueryRow(sqlStmt, 1).Scan(&bid, &title, &pubId, &pubName); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Book #%v, \"%v\" is published by publisher #%v, %v\n", bid, title,
+		pubId, pubName)
+
+	_, err = updatePublisherName(db, 1, "Inter-Varsity Press")
+
+	if err = db.QueryRow(sqlStmt, 1).Scan(&bid, &title, &pubId, &pubName); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("After modification, published by publisher #%v, %v\n", pubId, pubName)
+
+	_, err = updatePublisherName(db, 1, "IVP")
+
+	if err = db.QueryRow(sqlStmt, 1).Scan(&bid, &title, &pubId, &pubName); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("After reversion, published by publisher #%v, %v\n", pubId, pubName)
 	//   [todo] Modify series function (allow Null values with sql.NullString)
 	//   [todo] Modify series name function (does not allow null values)
 	//   [todo] Modify status function
