@@ -922,10 +922,64 @@ func updateBookPublisherByName(db DBInterface, id int, publisher string) (string
 	}
 
 	if updatedPublisher != publisher {
-		return "", fmt.Errorf("updatedBookPublisherByName, Updated publisher %v does not match requested publisher %v.", updatedPublisher, publisher)
+		return "", fmt.Errorf("updatedBookPublisherByName, Updated publisher %v does not match requested publisher %v.",
+			updatedPublisher, publisher)
 	}
 
 	return updatedPublisher, nil
+}
+
+func updatePublisherName(db DBInterface, id int, name string) (string, error) {
+	sqlStmt := `
+        UPDATE publishers
+        SET name = ?
+        WHERE publisher_id = ?
+    `
+
+	_, err := db.Exec(sqlStmt, name, id)
+	if err != nil {
+		return "", fmt.Errorf("updatePublisherName, Couldn't update publisher name: %v", err)
+	}
+
+	var updatedName string
+	if err := db.QueryRow("SELECT name FROM publishers WHERE publisher_id = ?",
+		id).Scan(&updatedName); err != nil {
+		return "", fmt.Errorf("updatePublisherName, Couldn't retrieve updated publisher: %v", err)
+	}
+
+	if updatedName != name {
+		return "", fmt.Errorf("updatePublsherName, New name %v does not match requested name %v.",
+			updatedName, name)
+	}
+
+	return updatedName, nil
+}
+
+func updateBookIsbn(db DBInterface, id int, isbn string) (string, error) {
+	sqlStmt := `
+        UPDATE books
+        SET isbn = ?
+        WHERE book_id = ?
+    `
+
+	_, err := db.Exec(sqlStmt, isbn, id)
+	if err != nil {
+		return "", fmt.Errorf("updateBookIsbn, Couldn't update isbn for book #%v: %v",
+			id, err)
+	}
+
+	var updatedIsbn string
+	if err := db.QueryRow("SELECT isbn FROM books WHERE book_id = ?",
+		id).Scan(&updatedIsbn); err != nil {
+		return "", fmt.Errorf("updateBookIsbn, Couldn't retrieve updated value: %v", err)
+	}
+
+	if updatedIsbn != isbn {
+		return "", fmt.Errorf("updateBookIsbn, Updated isbn %v does not match requested isbn %v",
+			updatedIsbn, isbn)
+	}
+
+	return updatedIsbn, nil
 }
 
 func main() {
