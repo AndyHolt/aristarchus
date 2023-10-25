@@ -899,7 +899,7 @@ func updateBookPublisherByName(db DBInterface, id int, publisher string) (string
 	pubId, err := publisherId(db, publisher)
 	if err != nil {
 		return "", fmt.Errorf("updateBookPublisherByName, Couldn't get id for publisher %v: %v",
-		    publisher, err)
+			publisher, err)
 	}
 
 	_, err = db.Exec(sqlStmt, pubId, id)
