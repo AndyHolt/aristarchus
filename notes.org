@@ -12,12 +12,30 @@
   just get all the rows from the database in one big move, then process them
   (parallelly?) in Go?
 - [ ] Search interface
+- [ ] Add column for edition description, as complement to edition number.
+  - E.g. if edition is "revised and expanded edition", that can't be contained
+    in an integer column. Create a separate database column for handling.
 - [ ] Add books by ISBN or title/author and automatically fetch data
 - [ ] Provide API for dealing with data in JSON
+- [ ] Perhaps add better (and customisable?) display of book details.
+  - Make a type for edition number, with a stringer method to turn integer into
+    a string, e.g. 1 -> "1st edition"
+    - 1, 2, 3 require particular handling, then 4--10 all have "th" suffix. This
+      repeats over all tens /except/ 11, 12, 13 which all have "th". This pattern
+      then continues for every hundred. So a general method can be easily
+      devised by testing modulo 10 and special cases for 11, 12 and 13.
 - [ ] Create React frontend for interacting
 - [ ] Consider how to use multiple users
 - [ ] Add categories for books, allowing browsing in different categories
 - [ ] Advanced search options for various fields
+- [ ] ISBN handling
+  - Check currently available packages for functionality
+  - Create a type for ISBNs, which can accept any form of ISBN (10 or 13)
+  - When assigning an ISBN, check it is valid by length, format, check digit,
+    and whatever else can be used.
+  - Store as simple string of digits (perhaps even an int?)
+  - Stringer method include separation of elements (complex!)
+  - Perhaps have  ability to scan a barcode?
 * Issues and technical notes
 - Currently using SQLite3 database, seems well suited to this as a personal
   project. But probably not suited to scaling to production, so will probably
