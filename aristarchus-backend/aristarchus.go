@@ -1417,7 +1417,6 @@ func main() {
 	}
 	fmt.Printf("After reversion, published by publisher #%v, %v\n", pubId, pubName)
 
-	//   [todo] Modify isbn function
 	//   [done] Modify publisher name function
 	fmt.Printf("\n*** Testing modification of publisher name ***\n")
 	if err = db.QueryRow(sqlStmt, 1).Scan(&bid, &title, &pubId, &pubName); err != nil {
@@ -1439,6 +1438,39 @@ func main() {
 		log.Fatal(err)
 	}
 	fmt.Printf("After reversion, published by publisher #%v, %v\n", pubId, pubName)
+
+	//   [done] Modify isbn function
+	fmt.Printf("\n*** Testing modification of ISBN number ***\n")
+
+	var isbn string
+
+	sqlStmt = `
+        SELECT book_id, title, isbn
+        FROM books
+        WHERE book_id = ?
+    `
+
+	if err := db.QueryRow(sqlStmt, 1).Scan(&bid, &title, &isbn); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Book #%v, \"%v\" has ISBN %v\n", bid, title, isbn)
+
+	_, err = updateBookIsbn(db, 1, "new fake isbn")
+
+	if err := db.QueryRow(sqlStmt, 1).Scan(&bid, &title, &isbn); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("After modification, book #%v, \"%v\" has ISBN %v\n", bid, title,
+		isbn)
+
+	_, err = updateBookIsbn(db, 1, "0-85111-723-6")
+
+	if err := db.QueryRow(sqlStmt, 1).Scan(&bid, &title, &isbn); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("After reversion, book #%v, \"%v\" has ISBN %v\n", bid, title,
+		isbn)
+
 	//   [todo] Modify series function (allow Null values with sql.NullString)
 	//   [todo] Modify series name function (does not allow null values)
 	//   [todo] Modify status function
