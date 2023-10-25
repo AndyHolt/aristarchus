@@ -831,6 +831,38 @@ func updateBookYear(db DBInterface, id int, year int) (int, error) {
 	return updatedYear, nil
 }
 
+func updateBookEdition(db DBInterface, id int, edition int) (int, error) {
+	var bookEdition sql.NullInt64
+	if edition == 0 {
+		bookEdition.Valid = false
+	} else {
+		bookEdition.Valid = true
+		bookEdition.Int64 = int64(edition)
+	}
+
+	sqlStmt := `
+        UPDATE books
+        SET edition = ?
+        WHERE book_id = ?
+    `
+
+	_, err := db.Exec(sqlStmt, bookEdition, id)
+	if err != nil {
+		return 0, fmt.Errorf("updateBookEdition, Couldn't update book #%v edition to %v: %v", id, bookEdition, err)
+	}
+
+	var updatedEdition sql.NullInt64
+	if err := db.QueryRow("SELECT edition FROM books WHERE book_id = ?",
+		id).Scan(&updatedEdition); err != nil {
+		return 0, fmt.Errorf("updateBookEdition, Couldn't retrieve updated edition value: %v", err)
+	}
+
+	if updatedEdition != bookEdition {
+		return 0, fmt.Errorf("updateBookEdition, Updated edition %v is not the required edition %v", updatedEdition, bookEdition)
+	}
+
+	return int(updatedEdition.Int64), nil
+}
 func main() {
 	// [todo] Replace most of main function with proper unit tests
 
@@ -1175,8 +1207,36 @@ func main() {
 	}
 	fmt.Printf("After reversion, publication year is %v\n", year)
 
-	//   [todo] Modify edition function (allow null value with sql.NullInt64)
 	//   [todo] Modify publisher function
+	//   [done] Modify edition function (allow null value with sql.NullInt64)
+	fmt.Printf("\n*** Testing modification of edition***\n")
+
+	var edition int
+	sqlStmt = `
+        SELECT book_id, title, edition
+        FROM books
+        WHERE book_id = ?
+    `
+
+	if err = db.QueryRow(sqlStmt, 5).Scan(&bid, &title, &edition); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Book id #%v, \"%v\" is edition %v\n", bid, title, edition)
+
+	_, err = updateBookEdition(db, 5, 3)
+
+	if err = db.QueryRow(sqlStmt, 5).Scan(&bid, &title, &edition); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("After modification, edition is %v\n", edition)
+
+	_, err = updateBookEdition(db, 5, 2)
+
+	if err = db.QueryRow(sqlStmt, 5).Scan(&bid, &title, &edition); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("After reversion, edition is %v\n", edition)
+
 	//   [todo] Modify publisher name function
 	//   [todo] Modify isbn function
 	//   [todo] Modify series function (allow Null values with sql.NullString)
