@@ -1052,6 +1052,36 @@ func updateBookSeriesByName(db DBInterface, id int, series string) (string, erro
 	return updatedSeries, nil
 }
 
+func updateSeriesName(db DBInterface, id int, name string) (string, error) {
+	if len(name) == 0 {
+		return "", fmt.Errorf("updateSeriesName: Series cannot have empty name. Perhaps you want to delete the series?")
+	}
+
+	sqlStmt := `
+        UPDATE series
+        SET series_name = ?
+        WHERE series_id = ?
+    `
+
+	_, err := db.Exec(sqlStmt, name, id)
+	if err != nil {
+		return "", fmt.Errorf("updateSeriesName, Could not update series name: %v", err)
+	}
+
+	var updatedName string
+	if err := db.QueryRow("SELECT series_name FROM series WHERE series_id = ?",
+		id).Scan(&updatedName); err != nil {
+		return "", fmt.Errorf("updateSeriesName, Couldn't retrieve updated value: %v", err)
+	}
+
+	if updatedName != name {
+		return "", fmt.Errorf("updateSeriesName: Updated name %v does not match requested name %v",
+			updatedName, name)
+	}
+
+	return updatedName, nil
+}
+
 func main() {
 	// [todo] Replace most of main function with proper unit tests
 
@@ -1624,8 +1654,43 @@ func main() {
 	fmt.Printf("After reversion, book #%v, \"%v\" is in series #%v, %v\n",
 		bid, title, seriesId, seriesName)
 
-	//   [todo] Modify series name function (does not allow null values)
 	//   [todo] Modify status function
+	//   [done] Modify series name function (does not allow null values)
+	fmt.Printf("\n*** Testing modification of series name ***\n")
+
+	if err := db.QueryRow(sqlStmt, 2).Scan(&bid, &title, &seriesId,
+		&seriesName); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Book #%v, \"%v\" is in series #%v, %v\n", bid, title, seriesId,
+		seriesName)
+
+	_, err = updateSeriesName(db, 1, "Multiple Wrong Views Books")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := db.QueryRow(sqlStmt, 2).Scan(&bid, &title, &seriesId,
+		&seriesName); err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("After modification, book #%v, \"%v\" is in series #%v, %v\n",
+		bid, title, seriesId, seriesName)
+
+	_, err = updateSeriesName(db, 1, "Spectrum Multiview Books")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := db.QueryRow(sqlStmt, 2).Scan(&bid, &title, &seriesId,
+		&seriesName); err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("After reversion, book #%v, \"%v\" is in series #%v, %v\n",
+		bid, title, seriesId, seriesName)
+
 	//   [todo] Modify purchased function (allow null values with sql.NullString)
 
 	// [todo] Add functions to delete from database
