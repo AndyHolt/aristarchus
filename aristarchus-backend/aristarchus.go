@@ -1253,6 +1253,32 @@ func deletePublisher(db DBInterface, id int) error {
 	return nil
 }
 
+func deleteSeries(db DBInterface, id int) error {
+	var seriesBooks int
+
+	sqlCheckBooks := `
+        SELECT COUNT(*)
+        FROM books
+        WHERE series_id = ?
+    `
+	if err := db.QueryRow(sqlCheckBooks, id).Scan(&seriesBooks); err != nil {
+		return fmt.Errorf("deleteSeries, Couldn't check series books in db: %v",
+			err)
+	}
+	if seriesBooks != 0 {
+		return fmt.Errorf("deleteSeries: Series #%v has books in db and cannot be deleted.", id)
+	}
+
+	sqlDeleteSeries := "DELETE FROM series WHERE series_id = ?"
+	_, err := db.Exec(sqlDeleteSeries, id)
+	if err != nil {
+		return fmt.Errorf("deleteSeries, Couldn't delete series #%v: %v", id,
+			err)
+	}
+
+	return nil
+}
+
 func main() {
 	// [todo] Replace most of main function with proper unit tests
 
