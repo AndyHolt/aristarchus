@@ -2023,8 +2023,6 @@ func main() {
 	}
 
 	//   [done] Delete publisher by ID function
-	// first check if they are associated with any books. If so, do not allow
-	// deletion. If no books have publisher, allow deletion
 	fmt.Printf("\n*** Testing deletion of publisher ***\n")
 
 	// first add publisher for deletion
