@@ -2057,5 +2057,40 @@ func main() {
 		log.Fatal(fmt.Errorf("Publisher #%v %v found after deletion.", pid, name))
 	}
 
-	//   [todo] Delete series by ID function
+	//   [done] Delete series by ID function
+	// first check if there are any books listed in that series. If so, do not
+	// allow deletion. Otherwise, delete.
+	fmt.Printf("\n*** Testing deletion of series ***\n")
+
+	// first add series for deletion
+	id, err = seriesId(db, "Calvin's New Testament Commentaries")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	sqlStmt = `
+        SELECT series_id, series_name
+        FROM series
+        WHERE series_id = ?
+    `
+
+	if err := db.QueryRow(sqlStmt, id).Scan(&pid, &name); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Series found in database: #%v, %v\n", pid, name)
+
+	err = deleteSeries(db, id)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := db.QueryRow(sqlStmt, id).Scan(&pid, &name); err != nil {
+		if err == sql.ErrNoRows {
+			fmt.Printf("Series successfully not found.\n")
+		} else {
+			log.Fatal(err)
+		}
+	} else {
+		log.Fatal(fmt.Errorf("Series #%v %v found after deletion.", pid, name))
+	}
 }
