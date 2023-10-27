@@ -1227,6 +1227,32 @@ func deletePerson(db DBInterface, id int) error {
 	return nil
 }
 
+func deletePublisher(db DBInterface, id int) error {
+	var publisherBooks int
+
+	sqlCheckBooks := `
+        SELECT COUNT(*)
+        FROM books
+        WHERE publisher_id = ?
+    `
+	if err := db.QueryRow(sqlCheckBooks, id).Scan(&publisherBooks); err != nil {
+		return fmt.Errorf("deletePublisher: Couldn't check publisher's books in db: %v",
+			err)
+	}
+	if publisherBooks != 0 {
+		return fmt.Errorf("deletePublisher: Publisher #%v has books in db and cannot be deleted.", id)
+	}
+
+	sqlDeletePublisher := "DELETE FROM publishers WHERE publisher_id = ?"
+	_, err := db.Exec(sqlDeletePublisher, id)
+	if err != nil {
+		return fmt.Errorf("deletePublisher, Couldn't delete publisher #%v: %v",
+			id, err)
+	}
+
+	return nil
+}
+
 func main() {
 	// [todo] Replace most of main function with proper unit tests
 
@@ -1996,6 +2022,42 @@ func main() {
 		log.Fatal(fmt.Errorf("Person #%v %v found after deletion.", pid, name))
 	}
 
-	//   [todo] Delete publisher by ID function
+	//   [done] Delete publisher by ID function
+	// first check if they are associated with any books. If so, do not allow
+	// deletion. If no books have publisher, allow deletion
+	fmt.Printf("\n*** Testing deletion of publisher ***\n")
+
+	// first add publisher for deletion
+	id, err = publisherId(db, "Hodder and Stoughton")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	sqlStmt = `
+        SELECT publisher_id, name
+        FROM publishers
+        WHERE publisher_id = ?
+    `
+
+	if err := db.QueryRow(sqlStmt, id).Scan(&pid, &name); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Publisher found in database: #%v, %v\n", pid, name)
+
+	err = deletePublisher(db, id)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := db.QueryRow(sqlStmt, id).Scan(&pid, &name); err != nil {
+		if err == sql.ErrNoRows {
+			fmt.Printf("Publisher successfully not found.\n")
+		} else {
+			log.Fatal(err)
+		}
+	} else {
+		log.Fatal(fmt.Errorf("Publisher #%v %v found after deletion.", pid, name))
+	}
+
 	//   [todo] Delete series by ID function
 }
