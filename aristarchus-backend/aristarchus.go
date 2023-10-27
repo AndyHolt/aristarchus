@@ -1306,7 +1306,7 @@ func main() {
 	// }
 	// fmt.Printf("ID of Karen H. Jobes is %v\n", id)
 
-	// [todo] Add functions to edit each attribute of the book
+	// [done] Add functions to edit each attribute of the book
 	//   [done] Modify author(s) of a book function
 	fmt.Printf("\n*** Testing modification of book author ***\n")
 	newAuthors, err := updateBookAuthor(db, 7, "P. G. Wodehouse, J. K. Rowling and Timothy Keller")
