@@ -1745,7 +1745,7 @@ func main() {
 	//   [done] Modify series by id function (allow Null values with sql.NullString)
 	fmt.Printf("\n*** Testing modification of series by series id ***\n")
 
-	var seriesId int
+	var serId int
 	var seriesName string
 
 	sqlStmt = `
@@ -1756,11 +1756,11 @@ func main() {
         WHERE book_id = ?
     `
 
-	if err := db.QueryRow(sqlStmt, 2).Scan(&bid, &title, &seriesId,
+	if err := db.QueryRow(sqlStmt, 2).Scan(&bid, &title, &serId,
 		&seriesName); err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("Book #%v, \"%v\" is in series #%v, %v\n", bid, title, seriesId,
+	fmt.Printf("Book #%v, \"%v\" is in series #%v, %v\n", bid, title, serId,
 		seriesName)
 
 	_, err = updateBookSeriesById(db, 2, 2)
@@ -1768,35 +1768,35 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err := db.QueryRow(sqlStmt, 2).Scan(&bid, &title, &seriesId,
+	if err := db.QueryRow(sqlStmt, 2).Scan(&bid, &title, &serId,
 		&seriesName); err != nil {
 		log.Fatal(err)
 	}
 
 	fmt.Printf("After modification, book #%v, \"%v\" is in series #%v, %v\n",
-		bid, title, seriesId, seriesName)
+		bid, title, serId, seriesName)
 
 	_, err = updateBookSeriesById(db, 2, 1)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	if err := db.QueryRow(sqlStmt, 2).Scan(&bid, &title, &seriesId,
+	if err := db.QueryRow(sqlStmt, 2).Scan(&bid, &title, &serId,
 		&seriesName); err != nil {
 		log.Fatal(err)
 	}
 
 	fmt.Printf("After reversion, book #%v, \"%v\" is in series #%v, %v\n",
-		bid, title, seriesId, seriesName)
+		bid, title, serId, seriesName)
 
 	//   [done] Modify series by series name function (empty string gives null)
 	fmt.Printf("\n*** Testing modification of series by series name ***\n")
 
-	if err := db.QueryRow(sqlStmt, 2).Scan(&bid, &title, &seriesId,
+	if err := db.QueryRow(sqlStmt, 2).Scan(&bid, &title, &serId,
 		&seriesName); err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("Book #%v, \"%v\" is in series #%v, %v\n", bid, title, seriesId,
+	fmt.Printf("Book #%v, \"%v\" is in series #%v, %v\n", bid, title, serId,
 		seriesName)
 
 	_, err = updateBookSeriesByName(db, 2, "Penguin Classics")
@@ -1804,35 +1804,35 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err := db.QueryRow(sqlStmt, 2).Scan(&bid, &title, &seriesId,
+	if err := db.QueryRow(sqlStmt, 2).Scan(&bid, &title, &serId,
 		&seriesName); err != nil {
 		log.Fatal(err)
 	}
 
 	fmt.Printf("After modification, book #%v, \"%v\" is in series #%v, %v\n",
-		bid, title, seriesId, seriesName)
+		bid, title, serId, seriesName)
 
 	_, err = updateBookSeriesByName(db, 2, "Spectrum Multiview Books")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	if err := db.QueryRow(sqlStmt, 2).Scan(&bid, &title, &seriesId,
+	if err := db.QueryRow(sqlStmt, 2).Scan(&bid, &title, &serId,
 		&seriesName); err != nil {
 		log.Fatal(err)
 	}
 
 	fmt.Printf("After reversion, book #%v, \"%v\" is in series #%v, %v\n",
-		bid, title, seriesId, seriesName)
+		bid, title, serId, seriesName)
 
 	//   [done] Modify series name function (does not allow null values)
 	fmt.Printf("\n*** Testing modification of series name ***\n")
 
-	if err := db.QueryRow(sqlStmt, 2).Scan(&bid, &title, &seriesId,
+	if err := db.QueryRow(sqlStmt, 2).Scan(&bid, &title, &serId,
 		&seriesName); err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("Book #%v, \"%v\" is in series #%v, %v\n", bid, title, seriesId,
+	fmt.Printf("Book #%v, \"%v\" is in series #%v, %v\n", bid, title, serId,
 		seriesName)
 
 	_, err = updateSeriesName(db, 1, "Multiple Wrong Views Books")
@@ -1840,26 +1840,26 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err := db.QueryRow(sqlStmt, 2).Scan(&bid, &title, &seriesId,
+	if err := db.QueryRow(sqlStmt, 2).Scan(&bid, &title, &serId,
 		&seriesName); err != nil {
 		log.Fatal(err)
 	}
 
 	fmt.Printf("After modification, book #%v, \"%v\" is in series #%v, %v\n",
-		bid, title, seriesId, seriesName)
+		bid, title, serId, seriesName)
 
 	_, err = updateSeriesName(db, 1, "Spectrum Multiview Books")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	if err := db.QueryRow(sqlStmt, 2).Scan(&bid, &title, &seriesId,
+	if err := db.QueryRow(sqlStmt, 2).Scan(&bid, &title, &serId,
 		&seriesName); err != nil {
 		log.Fatal(err)
 	}
 
 	fmt.Printf("After reversion, book #%v, \"%v\" is in series #%v, %v\n",
-		bid, title, seriesId, seriesName)
+		bid, title, serId, seriesName)
 
 	//   [done] Modify status function
 	fmt.Printf("\n*** Testing modification of book status ***\n")
