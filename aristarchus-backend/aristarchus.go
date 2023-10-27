@@ -1082,6 +1082,36 @@ func updateSeriesName(db DBInterface, id int, name string) (string, error) {
 	return updatedName, nil
 }
 
+func updateBookStatus(db DBInterface, id int, status string) (string, error) {
+	if len(status) == 0 {
+		return "", fmt.Errorf("updateBookStatus: Book status cannot be empty.")
+	}
+
+	sqlStmt := `
+        UPDATE books
+        SET status = ?
+        WHERE book_id = ?
+    `
+
+	_, err := db.Exec(sqlStmt, status, id)
+	if err != nil {
+		return "", fmt.Errorf("updateBookStatus, Cannot modify book status: %v", err)
+	}
+
+	var updatedStatus string
+	if err := db.QueryRow("SELECT status FROM books WHERE book_id = ?",
+		id).Scan(&updatedStatus); err != nil {
+		return "", fmt.Errorf("updateBookStatus, Could not retrieve updated value: %v", err)
+	}
+
+	if updatedStatus != status {
+		return "", fmt.Errorf("updateBookStatus: updated status %v is not requested status %v",
+			updatedStatus, status)
+	}
+
+	return updatedStatus, nil
+}
+
 func main() {
 	// [todo] Replace most of main function with proper unit tests
 
@@ -1654,7 +1684,6 @@ func main() {
 	fmt.Printf("After reversion, book #%v, \"%v\" is in series #%v, %v\n",
 		bid, title, seriesId, seriesName)
 
-	//   [todo] Modify status function
 	//   [done] Modify series name function (does not allow null values)
 	fmt.Printf("\n*** Testing modification of series name ***\n")
 
@@ -1690,6 +1719,36 @@ func main() {
 
 	fmt.Printf("After reversion, book #%v, \"%v\" is in series #%v, %v\n",
 		bid, title, seriesId, seriesName)
+
+	//   [done] Modify status function
+	fmt.Printf("\n*** Testing modification of book status ***\n")
+
+	var status string
+
+	sqlStmt = `
+        SELECT book_id, title, status
+        FROM books
+        WHERE book_id = ?
+    `
+
+	if err := db.QueryRow(sqlStmt, 1).Scan(&bid, &title, &status); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Book #%v, \"%v\" has status %v\n", bid, title, status)
+
+	_, err = updateBookStatus(db, 1, "Want")
+
+	if err := db.QueryRow(sqlStmt, 1).Scan(&bid, &title, &status); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("After modification, book #%v, \"%v\" has status %v\n", bid, title, status)
+
+	_, err = updateBookStatus(db, 1, "Owned")
+
+	if err := db.QueryRow(sqlStmt, 1).Scan(&bid, &title, &status); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("After reversion, book #%v, \"%v\" has status %v\n", bid, title, status)
 
 	//   [todo] Modify purchased function (allow null values with sql.NullString)
 
