@@ -1151,6 +1151,50 @@ func updateBookPurchaseDate(db DBInterface, id int, date PurchasedDate) (Purchas
 	return returnDate, nil
 }
 
+func deleteBook(db *sql.DB, id int) error {
+	// delete from book_author where book_id = id
+	// delete from book_editor where book_id = id
+	// delete from books where book_id = id
+
+	_, err := getBookById(db, id)
+	if err != nil {
+		return fmt.Errorf("deleteBook: %v", err)
+	}
+
+	// use transaction to ensure removal of authors/editors and book is atomic
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("deleteBook: Couldn't start sql transaction: %v", err)
+	}
+	defer tx.Rollback()
+
+	authorDeletion := "DELETE FROM book_author WHERE book_id = ?"
+	editorDeletion := "DELETE FROM book_editor WHERE book_id = ?"
+	bookDeletion := "DELETE FROM books       WHERE book_id = ?"
+
+	_, err = tx.Exec(authorDeletion, id)
+	if err != nil {
+		return fmt.Errorf("deleteBook: Problem removing book from book_author table: %v", err)
+	}
+
+	_, err = tx.Exec(editorDeletion, id)
+	if err != nil {
+		return fmt.Errorf("deleteBook: Problem removing book from book_editor table: %v", err)
+	}
+
+	_, err = tx.Exec(bookDeletion, id)
+	if err != nil {
+		return fmt.Errorf("deleteBook: Problem removing book from book table: %v", err)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("deleteBook, problem deleting book: %v", err)
+	}
+
+	return nil
+}
+
 func main() {
 	// [todo] Replace most of main function with proper unit tests
 
@@ -1830,7 +1874,58 @@ func main() {
 		title, purDate)
 
 	// [todo] Add functions to delete from database
-	//   [todo] Delete book by ID function
+	//   [done] Delete book by ID function
+	fmt.Printf("\n*** Testing deletion of book ***\n")
+
+	// first, add a book to delete
+	var tag Book
+	tag.editor = "Simon Gathercole"
+	tag.title = "The Apocryphal Gospels"
+	tag.year = 2021
+	tag.publisher = "Penguin"
+	tag.isbn = "978-0-241-34055-4"
+	tag.series = "Penguin Classics"
+	tag.status = "Owned"
+
+	var tagpd PurchasedDate
+	tagpd.setDate("March 2023")
+	tag.purchased = tagpd
+
+	id, err = addBook(db, &tag)
+	if err != nil {
+		if _, ok := err.(*AddingDuplicateBookError); ok {
+			fmt.Println(err)
+		} else {
+			log.Fatal(err)
+		}
+	}
+
+	sqlStmt = `
+        SELECT book_id, title, year
+        FROM books
+        WHERE book_id = ?
+    `
+
+	if err := db.QueryRow(sqlStmt, id).Scan(&bid, &title, &year); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Book found in database: #%v, \"%v\" (%v)\n", bid, title, year)
+
+	err = deleteBook(db, id)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := db.QueryRow(sqlStmt, id).Scan(&bid, &title, &year); err != nil {
+		if err == sql.ErrNoRows {
+			fmt.Printf("Book successfully not found in database.\n")
+		} else {
+			log.Fatal(err)
+		}
+	} else {
+		log.Fatal(fmt.Errorf("Book #%v found in database after deletion.", id))
+	}
+
 	//   [todo] Delete person by ID function
 	//   [todo] Delete publisher by ID function
 	//   [todo] Delete series by ID function
