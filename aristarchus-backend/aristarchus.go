@@ -373,7 +373,12 @@ func publisherId(db DBInterface, publisher string) (int, error) {
 }
 
 func seriesId(db DBInterface, series string) (int, error) {
+	if len(series) == 0 {
+		return 0, nil
+	}
+
 	var id int
+
 	if err := db.QueryRow("SELECT series_id FROM series WHERE series_name = ?",
 		series).Scan(&id); err != nil {
 		if err == sql.ErrNoRows {
