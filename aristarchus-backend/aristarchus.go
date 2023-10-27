@@ -1195,6 +1195,38 @@ func deleteBook(db *sql.DB, id int) error {
 	return nil
 }
 
+func deletePerson(db DBInterface, id int) error {
+	var personBooks int
+
+	sqlCheckBooks := `
+        SELECT COUNT(*)
+        FROM (
+            SELECT book_id
+            FROM book_author
+            WHERE author_id = ?
+            UNION
+            SELECT book_id
+            FROM book_editor
+            WHERE editor_id = ?
+        )
+    `
+	if err := db.QueryRow(sqlCheckBooks, id, id).Scan(&personBooks); err != nil {
+		return fmt.Errorf("deletePerson, Couldn't check person's books in db: %v",
+			err)
+	}
+	if personBooks != 0 {
+		return fmt.Errorf("deletePerson: Person #%v has books in db and cannot be deleted.", id)
+	}
+
+	sqlDeletePerson := "DELETE FROM people WHERE person_id = ?"
+	_, err := db.Exec(sqlDeletePerson, id)
+	if err != nil {
+		return fmt.Errorf("deletePerson, problem deleting person: %v", err)
+	}
+
+	return nil
+}
+
 func main() {
 	// [todo] Replace most of main function with proper unit tests
 
@@ -1926,7 +1958,44 @@ func main() {
 		log.Fatal(fmt.Errorf("Book #%v found in database after deletion.", id))
 	}
 
-	//   [todo] Delete person by ID function
+	//   [done] Delete person by ID function
+	fmt.Printf("\n*** Testing deletion of a person ***\n")
+
+	// first add a person for deletion
+	id, err = personId(db, "John Steinbeck")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var pid int
+	var name string
+
+	sqlStmt = `
+        SELECT person_id, name
+        FROM people
+        WHERE person_id = ?
+    `
+
+	if err := db.QueryRow(sqlStmt, id).Scan(&pid, &name); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Person found in database: #%v, %v\n", pid, name)
+
+	err = deletePerson(db, id)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := db.QueryRow(sqlStmt, id).Scan(&pid, &name); err != nil {
+		if err == sql.ErrNoRows {
+			fmt.Printf("Person successfully not found.\n")
+		} else {
+			log.Fatal(err)
+		}
+	} else {
+		log.Fatal(fmt.Errorf("Person #%v %v found after deletion.", pid, name))
+	}
+
 	//   [todo] Delete publisher by ID function
 	//   [todo] Delete series by ID function
 }
