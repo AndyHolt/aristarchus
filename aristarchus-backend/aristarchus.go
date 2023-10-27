@@ -1950,7 +1950,7 @@ func main() {
 
 	if err := db.QueryRow(sqlStmt, id).Scan(&bid, &title, &year); err != nil {
 		if err == sql.ErrNoRows {
-			fmt.Printf("Book successfully not found in database.\n")
+			fmt.Printf("Book successfully not found.\n")
 		} else {
 			log.Fatal(err)
 		}
