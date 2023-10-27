@@ -1112,6 +1112,45 @@ func updateBookStatus(db DBInterface, id int, status string) (string, error) {
 	return updatedStatus, nil
 }
 
+func updateBookPurchaseDate(db DBInterface, id int, date PurchasedDate) (PurchasedDate, error) {
+	var purDate sql.NullString
+	var returnDate PurchasedDate
+
+	if len(date.String()) == 0 {
+		purDate.Valid = false
+	} else {
+		purDate.Valid = true
+		purDate.String = date.String()
+	}
+
+	sqlStmt := `
+        UPDATE books
+        SET purchased_date = ?
+        WHERE book_id = ?
+    `
+
+	_, err := db.Exec(sqlStmt, purDate, id)
+	if err != nil {
+		return returnDate, fmt.Errorf("updateBookPurchaseDate, Couldn't modify purchased date: %v", err)
+	}
+
+	var updatedPurDate sql.NullString
+	if err := db.QueryRow("SELECT purchased_date FROM books WHERE book_id = ?",
+		id).Scan(&updatedPurDate); err != nil {
+		return returnDate, fmt.Errorf("updateBookPurchaseDate, Couldn't retrieve updated value: %v", err)
+	}
+
+	if updatedPurDate.Valid {
+		returnDate.setDate(updatedPurDate.String)
+	}
+
+	if returnDate != date {
+		return returnDate, fmt.Errorf("updateBookPurchaseDate: Updated date %v not same as requested date %v", returnDate, date)
+	}
+
+	return returnDate, nil
+}
+
 func main() {
 	// [todo] Replace most of main function with proper unit tests
 
@@ -1750,7 +1789,45 @@ func main() {
 	}
 	fmt.Printf("After reversion, book #%v, \"%v\" has status %v\n", bid, title, status)
 
-	//   [todo] Modify purchased function (allow null values with sql.NullString)
+	//   [done] Modify purchased function (allow null values with
+	//   sql.NullString)
+	fmt.Printf("\n*** Testing modification of purchase date ***\n")
+	var purDate PurchasedDate
+	purDate.setDate("May 2023")
+
+	var dateString string
+
+	sqlStmt = `
+        SELECT book_id, title, purchased_date
+        FROM books
+        WHERE book_id = ?
+    `
+
+	if err := db.QueryRow(sqlStmt, 1).Scan(&bid, &title, &dateString); err != nil {
+		log.Fatal(err)
+	}
+	purDate.setDate(dateString)
+	fmt.Printf("Book #%v, \"%v\" was purchased %v\n", bid, title, purDate)
+
+	purDate.setDate("December 1984")
+	_, err = updateBookPurchaseDate(db, 1, purDate)
+
+	if err := db.QueryRow(sqlStmt, 1).Scan(&bid, &title, &dateString); err != nil {
+		log.Fatal(err)
+	}
+	purDate.setDate(dateString)
+	fmt.Printf("After modification, book #%v, \"%v\" was purchased %v\n", bid,
+		title, purDate)
+
+	purDate.setDate("May 2023")
+	_, err = updateBookPurchaseDate(db, 1, purDate)
+
+	if err := db.QueryRow(sqlStmt, 1).Scan(&bid, &title, &dateString); err != nil {
+		log.Fatal(err)
+	}
+	purDate.setDate(dateString)
+	fmt.Printf("After reversion, book #%v, \"%v\" was purchased %v\n", bid,
+		title, purDate)
 
 	// [todo] Add functions to delete from database
 	//   [todo] Delete book by ID function
