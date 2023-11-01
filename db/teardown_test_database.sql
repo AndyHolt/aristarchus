@@ -1,0 +1,13 @@
+DELETE FROM book_author;
+DELETE FROM book_editor;
+DELETE FROM series;
+DELETE FROM books;
+DELETE FROM pubishers;
+DELETE FROM people;
+
+DROP TABLE IF EXISTS book_author;
+DROP TABLE IF EXISTS book_editor;
+DROP TABLE IF EXISTS series;
+DROP TABLE IF EXISTS books;
+DROP TABLE IF EXISTS publishers;
+DROP TABLE IF EXISTS people;
