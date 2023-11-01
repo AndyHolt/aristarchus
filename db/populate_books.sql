@@ -26,7 +26,7 @@ INSERT INTO books (title, subtitle, year, edition, publisher_id, isbn,
 series_id, status, purchased_date)
 VALUES
   ("Introduction to the Old Testament", NULL, 1969,  NULL, 1, "0-85111-723-6", NULL, "Owned", "May 2023"),
-  ("Divine Impassibility", "Four Views of God\'s Emotions and Suffering", 2019,  NULL, 1, "978-0-8308-5253-6", 1, "Owned", "October 2019"),
+  ("Divine Impassibility", "Four Views of God's Emotions and Suffering", 2019,  NULL, 1, "978-0-8308-5253-6", 1, "Owned", "October 2019"),
   ("Basic Writings", NULL, 2007, NULL, 2, "978-0-87220-895-7", NULL, "Owned", "October 2015"),
   ("How to Read and Understand the Biblical Prophets", NULL, 2017, NULL, 3, "978-1-4335-5403-8", NULL, "Owned", "July 2021"),
   ("Kingdom through Covenant", "A Biblical-Theological Understanding of the Covenants", 2018, 2, 3, "978-1-4335-5307-3", NULL, "Owned", "January 2022"),
