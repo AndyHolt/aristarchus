@@ -30,24 +30,57 @@ func (pd PurchasedDate) String() string {
 	return fmt.Sprintf("%v %v %v", pd.day, pd.month, pd.year)
 }
 
+type DateParsingError struct {
+	funcName     string
+	format       string
+	dateString   string
+	wrappedError error
+}
+
+func (e *DateParsingError) Error() string {
+	return fmt.Sprintf("%v, Problem parsing %v date %v: %v",
+		e.funcName,
+		e.format,
+		e.dateString,
+		e.wrappedError)
+}
+
+func (e *DateParsingError) Unwrap() error {
+	return e.wrappedError
+}
+
 func (pd *PurchasedDate) setDate(s string) error {
 	params := strings.Split(s, " ")
 	switch len(params) {
 	case 0:
-		return fmt.Errorf("setDate: Can't convert date %v", s)
+		return &DateParsingError{
+			funcName:     "setDate",
+			format:       "unknown",
+			dateString:   s,
+			wrappedError: nil,
+		}
 	case 1:
 		dateString := "2006"
 		t, err := time.Parse(dateString, s)
 		if err != nil {
-			return fmt.Errorf("setDate: Problem parsing year %v, %v", s, err)
+			return &DateParsingError{
+				funcName:     "setDate",
+				format:       "year",
+				dateString:   s,
+				wrappedError: err,
+			}
 		}
 		pd.year = t.Year()
 	case 2:
 		dateString := "January 2006"
 		t, err := time.Parse(dateString, s)
 		if err != nil {
-			return fmt.Errorf("setDate: Problem parsing month-year date %v, %v",
-				s, err)
+			return &DateParsingError{
+				funcName:     "setDate",
+				format:       "month year",
+				dateString:   s,
+				wrappedError: err,
+			}
 		}
 		pd.year = t.Year()
 		pd.month = t.Month()
@@ -55,8 +88,12 @@ func (pd *PurchasedDate) setDate(s string) error {
 		dateString := "2 January 2006"
 		t, err := time.Parse(dateString, s)
 		if err != nil {
-			return fmt.Errorf("setDate: Problem parsing day-month-year date %v, %v",
-				s, err)
+			return &DateParsingError{
+				funcName:     "setDate",
+				format:       "day month year",
+				dateString:   s,
+				wrappedError: err,
+			}
 		}
 		pd.year = t.Year()
 		pd.month = t.Month()
