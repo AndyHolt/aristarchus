@@ -1,6 +1,6 @@
 * Project progress, goals, scope, milestones
 - [X] Set up SQLite database
-- [ ] Create Go app to provide abilities to add, modify, view and delete books
+- [X] Create Go app to provide abilities to add, modify, view and delete books
   from library (manually) -- CRUD
 - [ ] Use prepared statements for database interaction where possible, to speed
   up a little. See [[https://go.dev/doc/database/prepared-statements][Using prepared statements]]. Ensure the interface ~DBInterface~
