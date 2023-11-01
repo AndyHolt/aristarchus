@@ -1957,7 +1957,7 @@ func main() {
 	fmt.Printf("After reversion, book #%v, \"%v\" was purchased %v\n", bid,
 		title, purDate)
 
-	// [todo] Add functions to delete from database
+	// [done] Add functions to delete from database
 	//   [done] Delete book by ID function
 	fmt.Printf("\n*** Testing deletion of book ***\n")
 
