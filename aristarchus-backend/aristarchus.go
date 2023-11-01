@@ -640,7 +640,7 @@ func updateBookAuthor(db *sql.DB, id int, authorString string) (string, error) {
 		_, err := tx.Exec("DELETE FROM book_author WHERE book_id = ? AND author_id = ?",
 			id, personId)
 		if err != nil {
-			return "", fmt.Errorf("updateBookAuthor: %v, err")
+			return "", fmt.Errorf("updateBookAuthor: %v", err)
 		}
 	}
 
@@ -708,7 +708,7 @@ func updateBookEditor(db *sql.DB, id int, editorString string) (string, error) {
 		_, err := tx.Exec("DELETE FROM book_editor WHERE book_id = ? AND editor_id = ?",
 			id, personId)
 		if err != nil {
-			return "", fmt.Errorf("updateBookEditor: %v, err")
+			return "", fmt.Errorf("updateBookEditor: %v", err)
 		}
 	}
 
@@ -745,7 +745,7 @@ func updatePersonName(db DBInterface, id int, newName string) (string, error) {
 		return "", fmt.Errorf("updatePersonName, Couldn't get updated name: %v", err)
 	}
 	if updatedName != newName {
-		return "", fmt.Errorf("updatePersonName, Updated name \"%v\" is not desired new name \"%v\".")
+		return "", fmt.Errorf("updatePersonName, Updated name \"%v\" is not desired new name \"%v\".", updatedName, newName)
 	}
 
 	return updatedName, nil
@@ -1322,7 +1322,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println("End of library\n")
+	fmt.Println("End of library")
 
 	// 	type Book struct {
 	// 	id        int
