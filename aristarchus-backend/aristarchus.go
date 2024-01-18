@@ -716,7 +716,7 @@ func updateBookEditor(db *sql.DB, id int, editorString string) (string, error) {
 		}
 	}
 
-	// start a transaction to make the edit of authors atomic
+	// start a transaction to make the edit of editors atomic
 	tx, err := db.Begin()
 	if err != nil {
 		return "", fmt.Errorf("updateBookEditor, Couldn't start sql transaction: %v", err)
