@@ -16,6 +16,8 @@
   - E.g. if edition is "revised and expanded edition", that can't be contained
     in an integer column. Create a separate database column for handling.
 - [ ] Add books by ISBN or title/author and automatically fetch data
+  - Try to use WorldCat for getting data. I think there is an API, but it may
+    require registration?
 - [ ] Provide API for dealing with data in JSON
 - [ ] Perhaps add better (and customisable?) display of book details.
   - Make a type for edition number, with a stringer method to turn integer into
