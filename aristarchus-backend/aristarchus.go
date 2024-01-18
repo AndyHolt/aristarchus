@@ -1473,36 +1473,36 @@ func main() {
 
 	// [done] Add functions to edit each attribute of the book
 	//   [done] Modify author(s) of a book function
-	fmt.Printf("\n*** Testing modification of book author ***\n")
-	newAuthors, err := updateBookAuthor(db, 7, "P. G. Wodehouse, J. K. Rowling and Timothy Keller")
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Printf("Authors of \"Invitation to the Septuagint\" are now %v\n",
-		newAuthors)
+	// fmt.Printf("\n*** Testing modification of book author ***\n")
+	// newAuthors, err := updateBookAuthor(db, 7, "P. G. Wodehouse, J. K. Rowling and Timothy Keller")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// fmt.Printf("Authors of \"Invitation to the Septuagint\" are now %v\n",
+	// 	newAuthors)
 
-	newAuthors, err = updateBookAuthor(db, 7, "Karen H. Jobes and Moisés Silva")
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Printf("Authors of \"Invitation to the Septuagint\" are now %v\n",
-		newAuthors)
+	// newAuthors, err = updateBookAuthor(db, 7, "Karen H. Jobes and Moisés Silva")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// fmt.Printf("Authors of \"Invitation to the Septuagint\" are now %v\n",
+	// 	newAuthors)
 
-	//   [done] Modify editor(s) of a book function
-	fmt.Printf("\n*** Testing modification of book editor ***\n")
-	newEditors, err := updateBookEditor(db, 7, "Anselm and P. G. Wodehouse")
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Printf("Editors of \"Invitation to the Septuagint\" are now %v\n",
-		newEditors)
+	// //   [done] Modify editor(s) of a book function
+	// fmt.Printf("\n*** Testing modification of book editor ***\n")
+	// newEditors, err := updateBookEditor(db, 7, "Anselm and P. G. Wodehouse")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// fmt.Printf("Editors of \"Invitation to the Septuagint\" are now %v\n",
+	// 	newEditors)
 
-	newEditors, err = updateBookEditor(db, 7, "")
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Printf("Editors of \"Invitation to the Septuagint\" are now %v\n",
-		newEditors)
+	// newEditors, err = updateBookEditor(db, 7, "")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// fmt.Printf("Editors of \"Invitation to the Septuagint\" are now %v\n",
+	// 	newEditors)
 
 	//   [done] Modify a person's name function
 	fmt.Printf("\n*** Testing modification of person's name ***\n")

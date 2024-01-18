@@ -59,6 +59,24 @@ func teardownTestDatabase() (err error) {
 	return nil
 }
 
+func makeTestBook() *Book {
+	var itts Book
+
+	itts.author = "Karen H. Jobes and Moisés Silva"
+	itts.title = "Invitation to the Septuagint"
+	itts.year = 2015
+	itts.edition = 2
+	itts.publisher = "Baker Academic"
+	itts.isbn = "978-0-8010-3649-1"
+	itts.status = "Owned"
+
+	var ittspd PurchasedDate
+	ittspd.setDate("December 2021")
+	itts.purchased = ittspd
+
+	return &itts
+}
+
 func TestPingDatabase(t *testing.T) {
 	db, err := sql.Open("sqlite3", "testdb.sqlite")
 	if err != nil {
@@ -161,7 +179,7 @@ func TestPurchasedDateInvalidDate(t *testing.T) {
 
 	err := pd.setDate(dateString)
 	if err == nil {
-		t.Errorf("No error returned with invalid date %v: %v", dateString, err)
+		t.Errorf("No error returned with invalid date %v", dateString)
 	} else {
 		var dpe *DateParsingError
 		if !errors.As(err, &dpe) {
@@ -171,23 +189,69 @@ func TestPurchasedDateInvalidDate(t *testing.T) {
 	}
 }
 
-// purchased date: test invalid format (real date)
+func TestPurchasedDateInvalidFormat(t *testing.T) {
+	dateString := "11/5/2019"
+	var pd PurchasedDate
 
-// test book String() method
-// test book AuthorEditor method
-// test book FullTitle method
+	err := pd.setDate(dateString)
+	if err == nil {
+		t.Errorf("No error returned with invalid date format %v", dateString)
+	} else {
+		var dpe *DateParsingError
+		if !errors.As(err, &dpe) {
+			t.Errorf("Wrong error type raised with invalid date format %v: %v",
+				dateString, err)
+		}
+	}
+}
 
-// test getListOfBookIds function
+func TestBookStringMethod(t *testing.T) {
+	b := *makeTestBook()
 
-// test FormatNameList function
-// test NameListFromString function
-// test GetAuthorsListById function
-// test GetEditorsListById function
-// test GetBookById function
-// test PersonId function
-// test PublisherId function
-// test SeriesId function
-// test CheckBookInDb function
+	expected := "Karen H. Jobes and Moisés Silva, Invitation to the Septuagint (2015) [Owned]"
+
+	bkStr := b.String()
+
+	if bkStr != expected {
+		t.Errorf("Wrong value returned by String method on Book: expected %v, got %v", expected, bkStr)
+	}
+}
+
+func TestBookAuthorEditor(t *testing.T) {
+	b := *makeTestBook()
+	expected := "Karen H. Jobes and Moisés Silva"
+
+	bkAuEd := b.authorEditor()
+
+	if bkAuEd != expected {
+		t.Errorf("Wrong value returned by authorEditor method on Book: expected %v, got %v",
+			expected, bkAuEd)
+	}
+}
+
+func TestBookFullTitle(t *testing.T) {
+	b := *makeTestBook()
+	expected := "Invitation to the Septuagint"
+
+	bkFullTi := b.fullTitle()
+
+	if bkFullTi != expected {
+		t.Errorf("Wrong value returned by fullTitle method on Book: expected %v, got %v",
+			expected, bkFullTi)
+	}
+}
+
+// [todo]  test getListOfBookIds function
+
+// [todo]  test FormatNameList function
+// [todo]  test NameListFromString function
+// [todo]  test GetAuthorsListById function
+// [todo]  test GetEditorsListById function
+// [todo]  test GetBookById function
+// [todo]  test PersonId function
+// [todo]  test PublisherId function
+// [todo]  test SeriesId function
+// [todo]  test CheckBookInDb function
 
 func TestCountAllBooks(t *testing.T) {
 	db, err := sql.Open("sqlite3", "testdb.sqlite")
@@ -346,28 +410,112 @@ func TestUpdateBookAuthor(t *testing.T) {
 	}
 
 	if updatedAuthors != newAuthors {
-		t.Errorf("Author(s) not properly reverted. Resset author(s) should be %v, but is %v",
+		t.Errorf("Author(s) not properly reverted. Reset author(s) should be %v, but is %v",
 			newAuthors, updatedAuthors)
 	}
-
 }
 
-// test modification of book editor
-// test modification of person's name
-// test modification of book title (test empty string)
-// test modification of book subtitle (ensure empty string results in NULL)
-// test modification of book year
-// test modification of book edition (including null)
-// test modification of book publisher by id (try invalid ids)
-// test modification of book publisher by name
-// test modification of publisher name
-// test modification of isbn
-// test modification of series by id (including trying invalid ids)
-// test modification of series by name (including empty string for NULL)
-// test modification of series name (including error for empty string)
-// test modification of status function (empty string?)
-// test modification of purchased function (empty for NULL)
-// test deletion of book by ID
-// test deletion of person by ID
-// test deletion of publisher by ID
-// test deletion of series by ID
+func TestUpdateBookEditor(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	var newEditors string
+	newEditors = "James H. Charlesworth, Heinrich von Siebenthal and Francis Brown"
+	updatedEditors, err := updateBookEditor(db, 6, newEditors)
+	if err != nil {
+		t.Errorf("Problem updating book author: %v", err)
+	}
+
+	if updatedEditors != newEditors {
+		t.Errorf("Editors not properly updated. Updated editors should be %v, but is %v",
+			newEditors, updatedEditors)
+	}
+
+	newEditors = "N. Gray Sutanto, James Eglinton and Cory C. Brock"
+	updatedEditors, err = updateBookEditor(db, 6, newEditors)
+	if err != nil {
+		t.Errorf("Problem reverting updated book editors: %v", err)
+	}
+
+	if updatedEditors != newEditors {
+		t.Errorf("Editors not properly reverted. Reset editors should be %v, but were %v",
+			newEditors, updatedEditors)
+	}
+}
+
+// [todo] test modification of person's name
+func TestUpdatePersonName(t *testing.T) {
+    db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	var newName string
+	newName = "Geoffrey Parker Jr"
+	updatedName, err := updatePersonName(db, 3, newName)
+	if err != nil {
+		t.Errorf("Problem updating person's name: %v", err)
+	}
+	if updatedName != newName {
+		t.Errorf("Name not updated properly, \"%v\" is not \"%v\"",
+			updatedName, newName)
+	}
+
+	bookId := 4
+	queriedName, err := getAuthorsListById(db, bookId)
+	if err != nil {
+		t.Errorf("Problem getting book #%v's author: %v", bookId, err)
+	}
+
+	if len(queriedName) != 1 {
+		t.Errorf("Expected a single name, but got %v: %v", len(queriedName), queriedName)
+	}
+	if queriedName[0] != newName {
+		t.Errorf("Person's name not properly updated, \"%v\" is not \"%v\"",
+		queriedName[0], newName)
+	}
+
+	newName = "Peter J. Gentry"
+	updatedName, err = updatePersonName(db, 3, newName)
+	if err != nil {
+		t.Errorf("Problem reverting person's name: %v", err)
+	}
+	if updatedName != newName {
+		t.Errorf("Name not updated properly, \"%v\" is not \"%v\"",
+			updatedName, newName)
+	}
+
+	queriedName, err = getAuthorsListById(db, bookId)
+	if err != nil {
+		t.Errorf("Problem getting book #%v's author: %v", bookId, err)
+	}
+	if len(queriedName) != 1 {
+		t.Errorf("Expected a single name, but got %v: %v", len(queriedName), queriedName)
+	}
+	if queriedName[0] != newName {
+		t.Errorf("Person's name not properly reverted, \"%v\" is not \"%v\"",
+		queriedName[0], newName)
+	}
+}
+
+// [todo] test modification of book title (test empty string)
+// [todo] test modification of book subtitle (ensure empty string results in NULL)
+// [todo] test modification of book year
+// [todo] test modification of book edition (including null)
+// [todo] test modification of book publisher by id (try invalid ids)
+// [todo] test modification of book publisher by name
+// [todo] test modification of publisher name
+// [todo] test modification of isbn
+// [todo] test modification of series by id (including trying invalid ids)
+// [todo] test modification of series by name (including empty string for NULL)
+// [todo] test modification of series name (including error for empty string)
+// [todo] test modification of status function (empty string?)
+// [todo] test modification of purchased function (empty for NULL)
+// [todo] test deletion of book by ID
+// [todo] test deletion of person by ID
+// [todo] test deletion of publisher by ID
+// [todo] test deletion of series by ID
