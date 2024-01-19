@@ -448,7 +448,7 @@ func TestUpdateBookEditor(t *testing.T) {
 
 // [todo] test modification of person's name
 func TestUpdatePersonName(t *testing.T) {
-    db, err := sql.Open("sqlite3", "testdb.sqlite")
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
 	if err != nil {
 		t.Errorf("Problem opening database: %v", err)
 	}
@@ -476,7 +476,7 @@ func TestUpdatePersonName(t *testing.T) {
 	}
 	if queriedName[0] != newName {
 		t.Errorf("Person's name not properly updated, \"%v\" is not \"%v\"",
-		queriedName[0], newName)
+			queriedName[0], newName)
 	}
 
 	newName = "Peter J. Gentry"
@@ -498,17 +498,605 @@ func TestUpdatePersonName(t *testing.T) {
 	}
 	if queriedName[0] != newName {
 		t.Errorf("Person's name not properly reverted, \"%v\" is not \"%v\"",
-		queriedName[0], newName)
+			queriedName[0], newName)
 	}
 }
 
-// [todo] test modification of book title (test empty string)
-// [todo] test modification of book subtitle (ensure empty string results in NULL)
-// [todo] test modification of book year
-// [todo] test modification of book edition (including null)
+func TestUpdateBookTitle(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	var newTitle string = "The Art of Old Testament Studies"
+	updatedTitle, err := updateBookTitle(db, 1, newTitle)
+	if err != nil {
+		t.Errorf("Problem updating book title: %v", err)
+	}
+	if updatedTitle != newTitle {
+		t.Errorf("Title not correctly modified. Should be \"%v\", instead is \"%v\"",
+			newTitle, updatedTitle)
+	}
+
+	// Reset to proper value for other tests to use an unmodified database
+	newTitle = "Introduction to the Old Testament"
+	updatedTitle, err = updateBookTitle(db, 1, newTitle)
+	if err != nil {
+		t.Errorf("Problem reverting book title: %v", err)
+	}
+	if updatedTitle != newTitle {
+		t.Errorf("Title not correctly reverted. Should be \"%v\", instead is \"%v\"",
+			newTitle, updatedTitle)
+	}
+}
+
+func TestUpdateBookTitleEmpty(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	var emptyTitle string = ""
+	updatedTitle, err := updateBookTitle(db, 1, emptyTitle)
+	var ete *EmptyTitleError
+	if errors.Is(err, ete) {
+		t.Errorf("Updating title with empty string returned unexpected error: %v", err)
+	}
+	if updatedTitle == "" {
+		t.Errorf("Title illegally updated to empty string")
+	}
+
+	// also check that the book has not been modified
+	b, err := getBookById(db, 1)
+	if b.title != "Introduction to the Old Testament" {
+		t.Errorf("Book title has been wrongly modified to \"%v\"", b.title)
+	}
+}
+
+func TestUpdateBookSubtitle(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	var newSubtitle string = "Four views, at least three of them wrong"
+
+	updatedSubtitle, err := updateBookSubtitle(db, 2, newSubtitle)
+	if err != nil {
+		t.Errorf("Problem updating subtitle: %v", err)
+	}
+	if updatedSubtitle != newSubtitle {
+		t.Errorf("Wrongly updated subtitle: should be \"%v\" but got \"%v\"",
+			newSubtitle, updatedSubtitle)
+	}
+
+	b, err := getBookById(db, 2)
+	if b.subtitle != newSubtitle {
+		t.Errorf("Wrongly updated subtitle from book: should be \"%v\" but got \"%v\"",
+			newSubtitle, updatedSubtitle)
+	}
+
+	// Revert database back to original state
+	newSubtitle = "Four Views of God's Emotions and Suffering"
+	updatedSubtitle, err = updateBookSubtitle(db, 2, newSubtitle)
+	if err != nil {
+		t.Errorf("Problem reverting subtitle: %v", err)
+	}
+	if updatedSubtitle != newSubtitle {
+		t.Errorf("Wrongly reverted subtitle: should be \"%v\" but got \"%v\"",
+			newSubtitle, updatedSubtitle)
+	}
+
+	b, err = getBookById(db, 2)
+	if b.subtitle != newSubtitle {
+		t.Errorf("Wrongly reverted subtitle from book: should be \"%v\" but got \"%v\"",
+			newSubtitle, updatedSubtitle)
+	}
+}
+
+// Empty subtitle should set null value in database, not an empty string
+func TestUpdateBookSubtitleEmpty(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	var newSubtitle string = ""
+	updatedSubtitle, err := updateBookSubtitle(db, 2, newSubtitle)
+	if err != nil {
+		t.Errorf("Problem updating subtitle: %v", err)
+	}
+	if updatedSubtitle != newSubtitle {
+		t.Errorf("Wrongly updated subtitle: should be \"%v\", but got \"%v\"",
+			newSubtitle, updatedSubtitle)
+	}
+
+	// check for non-null subtitles: error if any found
+	sqlStmt := `
+      SELECT subtitle
+      FROM books
+      WHERE book_id = ? AND subtitle IS NOT NULL
+    `
+	var readSubtitle string
+	rows, err := db.Query(sqlStmt, 2)
+	if err != nil {
+		t.Errorf("querying subtitle in database: %v", err)
+	}
+	defer rows.Close()
+	if rows.Next() {
+		if err := rows.Scan(&readSubtitle); err != nil {
+			t.Errorf("Issue scanning row: %v", err)
+		}
+		t.Errorf("Query returned non-null value \"%v\"", readSubtitle)
+	} else {
+		if err := rows.Err(); err != nil {
+			t.Errorf("rows.Next() failed with non-nil error: %v", err)
+		}
+	}
+
+	// check for null subtitle: error if none found
+	sqlStmt = `
+      SELECT subtitle
+      FROM books
+      WHERE book_id = ? AND subtitle IS NULL
+    `
+	var readNullSubtitle sql.NullString
+	rows, err = db.Query(sqlStmt, 2)
+	if err != nil {
+		t.Errorf("Querying subtitle in database: %v", err)
+	}
+	defer rows.Close()
+	if rows.Next() {
+		if err := rows.Scan(&readNullSubtitle); err != nil {
+			t.Errorf("Issue scanning row: %v", err)
+		}
+		if readNullSubtitle.Valid {
+			t.Errorf("Query returned valid subtitle: \"%v\"", readNullSubtitle.String)
+		}
+	} else {
+		t.Errorf("rows.Next() failed with err: %v", rows.Err())
+	}
+	// Now we need to explicitly close rows to unlock the database for reversion
+	// to original values. We can't wait for the deferred function to take
+	// effect.
+	rows.Close()
+
+	// Revert database to original state
+	var origSubtitle string = "Four Views of God's Emotions and Suffering"
+	revertedSubtitle, err := updateBookSubtitle(db, 2, origSubtitle)
+	if err != nil {
+		t.Errorf("Problem reverting subtitle: %v", err)
+	}
+	if revertedSubtitle != origSubtitle {
+		t.Errorf("Wrongly reverted subtitle: should be \"%v\", but got \"%v\"",
+			origSubtitle, revertedSubtitle)
+	}
+}
+
+func TestUpdateBookYear(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	var newYear int = 2024
+	updatedYear, err := updateBookYear(db, 1, newYear)
+	if err != nil {
+		t.Errorf("Problem updating book year: %v", err)
+	}
+	if updatedYear != newYear {
+		t.Errorf("Wrongly updated year: Should be %v but got %v", newYear, updatedYear)
+	}
+
+	b, err := getBookById(db, 1)
+	if b.year != newYear {
+		t.Errorf("Book year is wrong in database: should be %v, but is %v",
+			newYear, b.year)
+	}
+
+	// Revert to restore database state
+	var origYear int = 1969
+	revertedYear, err := updateBookYear(db, 1, origYear)
+	if err != nil {
+		t.Errorf("Problem reverting book year: %v", err)
+	}
+	if revertedYear != origYear {
+		t.Errorf("Wrongly reverted year: should be %v but got %v", origYear, revertedYear)
+	}
+
+	b, err = getBookById(db, 1)
+	if b.year != origYear {
+		t.Errorf("Reverted book year is wrong in database: should be %v, but is %v",
+			origYear, b.year)
+	}
+}
+
+func TestUpdateBookEdition(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	var newEdition int = 5
+
+	updatedEdition, err := updateBookEdition(db, 5, newEdition)
+	if err != nil {
+		t.Errorf("Problem updating edition: %v", err)
+	}
+	if updatedEdition != newEdition {
+		t.Errorf("Wrongly updated edition: should be \"%v\" but got \"%v\"",
+			newEdition, updatedEdition)
+	}
+
+	b, err := getBookById(db, 5)
+	if b.edition != newEdition {
+		t.Errorf("Wrongly updated edition from book: should be \"%v\" but got \"%v\"",
+			newEdition, b.edition)
+	}
+
+	// Revert database back to original state
+	origEdition := 2
+	revertedEdition, err := updateBookEdition(db, 5, origEdition)
+	if err != nil {
+		t.Errorf("Problem reverting edition: %v", err)
+	}
+	if revertedEdition != origEdition {
+		t.Errorf("Wrongly reverted edition: should be \"%v\" but got \"%v\"",
+			origEdition, revertedEdition)
+	}
+
+	b, err = getBookById(db, 5)
+	if b.edition != origEdition {
+		t.Errorf("Wrongly reverted edition from book: should be \"%v\" but got \"%v\"",
+			origEdition, revertedEdition)
+	}
+}
+
+// Empty subtitle should set null value in database, not an empty string
+func TestUpdateBookEditionZero(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	var newEdition int = 0
+	updatedEdition, err := updateBookEdition(db, 5, newEdition)
+	if err != nil {
+		t.Errorf("Problem updating edition: %v", err)
+	}
+	if updatedEdition != newEdition {
+		t.Errorf("Wrongly updated edition: should be \"%v\", but got \"%v\"",
+			newEdition, updatedEdition)
+	}
+
+	// check for non-null edition: error if any found
+	sqlStmt := `
+      SELECT edition
+      FROM books
+      WHERE book_id = ? AND edition IS NOT NULL
+    `
+	var readEdition int
+	rows, err := db.Query(sqlStmt, 5)
+	if err != nil {
+		t.Errorf("querying non-null edition in database: %v", err)
+	}
+	defer rows.Close()
+	if rows.Next() {
+		if err := rows.Scan(&readEdition); err != nil {
+			t.Errorf("Issue scanning row: %v", err)
+		}
+		t.Errorf("Query returned non-null value \"%v\"", readEdition)
+	} else {
+		if err := rows.Err(); err != nil {
+			t.Errorf("rows.Next() failed with non-nil error: %v", err)
+		}
+	}
+
+	// check for null subtitle: error if none found
+	sqlStmt = `
+      SELECT edition
+      FROM books
+      WHERE book_id = ? AND edition IS NULL
+    `
+	var readNullEdition sql.NullInt64
+	rows, err = db.Query(sqlStmt, 5)
+	if err != nil {
+		t.Errorf("Querying null edition in database: %v", err)
+	}
+	defer rows.Close()
+	if rows.Next() {
+		if err := rows.Scan(&readNullEdition); err != nil {
+			t.Errorf("Issue scanning row: %v", err)
+		}
+		if readNullEdition.Valid {
+			t.Errorf("Query returned valid (non-null) edition: \"%v\"",
+				readNullEdition.Int64)
+		}
+	} else {
+		t.Errorf("rows.Next() failed with err: %v", rows.Err())
+	}
+	// Now we need to explicitly close rows to unlock the database for reversion
+	// to original values. We can't wait for the deferred function to take
+	// effect.
+	rows.Close()
+
+	// Revert database to original state
+	var origEdition int = 2
+	revertedEdition, err := updateBookEdition(db, 5, origEdition)
+	if err != nil {
+		t.Errorf("Problem reverting edition: %v", err)
+	}
+	if revertedEdition != origEdition {
+		t.Errorf("Wrongly reverted edition: should be \"%v\", but got \"%v\"",
+			origEdition, revertedEdition)
+	}
+}
+
 // [todo] test modification of book publisher by id (try invalid ids)
+func TestUpdateBookPublisherById(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	var newPublisherId int = 3
+
+	updatedPublisherId, err := updateBookPublisherById(db, 1, newPublisherId)
+	if err != nil {
+		t.Errorf("Problem updating publisher: %v", err)
+	}
+	if updatedPublisherId != newPublisherId {
+		t.Errorf("Wrongly updated publisher: should be \"%v\" but got \"%v\"",
+			newPublisherId, updatedPublisherId)
+	}
+
+	b, err := getBookById(db, 1)
+	retrievedPublisherId, err := publisherId(db, b.publisher)
+	if err != nil {
+		t.Errorf("Problem getting publisher ID for publisher \"%v\": %v",
+			b.publisher, err)
+	}
+	if retrievedPublisherId != newPublisherId {
+		t.Errorf("Wrongly updated publisher from book: should be \"%v\" but got \"%v\"",
+			newPublisherId, retrievedPublisherId)
+	}
+
+	// Revert database back to original state
+	origPublisherId := 1
+	revertedPublisherId, err := updateBookPublisherById(db, 1, origPublisherId)
+	if err != nil {
+		t.Errorf("Problem reverting publisher: %v", err)
+	}
+	if revertedPublisherId != origPublisherId {
+		t.Errorf("Wrongly reverted publisher: should be \"%v\" but got \"%v\"",
+			origPublisherId, revertedPublisherId)
+	}
+
+	b, err = getBookById(db, 1)
+	restoredPublisherId, err := publisherId(db, b.publisher)
+	if restoredPublisherId != origPublisherId {
+		t.Errorf("Wrongly reverted publisher from book: should be \"%v\" but got \"%v\"",
+			origPublisherId, restoredPublisherId)
+	}
+}
+
+func TestUpdateBookPublisherByIdInvalid(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	var origPublisherId int = 1
+	var newPublisherId int = 17
+
+	updatedPublisherId, err := updateBookPublisherById(db, 1, newPublisherId)
+	if err == nil {
+		t.Errorf("Publisher updated to invalid id #%v without error", newPublisherId)
+	} else {
+		var invPubIdErr *InvalidPublisherIdError
+		if !errors.As(err, &invPubIdErr) {
+			t.Errorf("Unexpected error when updating publisher to invalid id: %v", err)
+		}
+	}
+
+	if updatedPublisherId != origPublisherId {
+		t.Errorf("Invalid publisher update: should remain \"%v\" but got \"%v\"",
+			origPublisherId, updatedPublisherId)
+	}
+
+	b, err := getBookById(db, 1)
+	retrievedPublisherId, err := publisherId(db, b.publisher)
+	if err != nil {
+		t.Errorf("Problem getting publisher ID for publisher \"%v\": %v",
+			b.publisher, err)
+	}
+	if retrievedPublisherId != origPublisherId {
+		t.Errorf("Wrongly updated publisher from book: should remain \"%v\" but got \"%v\"",
+			origPublisherId, retrievedPublisherId)
+	}
+
+	// Revert database back to original state (should have no effect)
+	revertedPublisherId, err := updateBookPublisherById(db, 1, origPublisherId)
+	if err != nil {
+		t.Errorf("Problem reverting publisher: %v", err)
+	}
+	if revertedPublisherId != origPublisherId {
+		t.Errorf("Wrongly reverted publisher: should be \"%v\" but got \"%v\"",
+			origPublisherId, revertedPublisherId)
+	}
+
+	b, err = getBookById(db, 1)
+	restoredPublisherId, err := publisherId(db, b.publisher)
+	if restoredPublisherId != origPublisherId {
+		t.Errorf("Wrongly reverted publisher from book: should be \"%v\" but got \"%v\"",
+			origPublisherId, restoredPublisherId)
+	}
+}
+
 // [todo] test modification of book publisher by name
+func TestUpdateBookPublisherByName(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	var newPublisher string = "Penguin Books"
+
+	updatedPublisher, err := updateBookPublisherByName(db, 1, newPublisher)
+	if err != nil {
+		t.Errorf("Problem updating publisher: %v", err)
+	}
+	if updatedPublisher != newPublisher {
+		t.Errorf("Wrongly updated publisher: should be \"%v\" but got \"%v\"",
+			newPublisher, updatedPublisher)
+	}
+
+	b, err := getBookById(db, 1)
+	if b.publisher != newPublisher {
+		t.Errorf("Wrongly updated publisher from book: should be \"%v\" but got \"%v\"",
+			newPublisher, b.publisher)
+	}
+
+	// Revert database back to original state
+	origPublisher := "IVP"
+	revertedPublisher, err := updateBookPublisherByName(db, 1, origPublisher)
+	if err != nil {
+		t.Errorf("Problem reverting publisher: %v", err)
+	}
+	if revertedPublisher != origPublisher {
+		t.Errorf("Wrongly reverted publisher: should be \"%v\" but got \"%v\"",
+			origPublisher, revertedPublisher)
+	}
+
+	b, err = getBookById(db, 1)
+	if b.publisher != origPublisher {
+		t.Errorf("Wrongly reverted publisher from book: should be \"%v\" but got \"%v\"",
+			origPublisher, b.publisher)
+	}
+}
+
+func TestUpdateBookPublisherByNameEmptyString(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	var newPublisher string = ""
+	origPublisher := "IVP"
+
+	_, err = updateBookPublisherByName(db, 1, newPublisher)
+	if err == nil {
+		t.Errorf("Did not raise error when setting publisher to empty string")
+	}
+
+	b, err := getBookById(db, 1)
+	if b.publisher != origPublisher {
+		t.Errorf("Wrongly updated publisher from book: should be \"%v\" but got \"%v\"",
+			newPublisher, b.publisher)
+	}
+
+	// Revert database back to original state
+	revertedPublisher, err := updateBookPublisherByName(db, 1, origPublisher)
+	if err != nil {
+		t.Errorf("Problem reverting publisher: %v", err)
+	}
+	if revertedPublisher != origPublisher {
+		t.Errorf("Wrongly reverted publisher: should be \"%v\" but got \"%v\"",
+			origPublisher, revertedPublisher)
+	}
+
+	b, err = getBookById(db, 1)
+	if b.publisher != origPublisher {
+		t.Errorf("Wrongly reverted publisher from book: should be \"%v\" but got \"%v\"",
+			origPublisher, b.publisher)
+	}
+}
+
 // [todo] test modification of publisher name
+func TestUpdatePublisherName(t *testing.T) {
+    db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	origName := "IVP"
+	origId, err := publisherId(db, origName)
+	if err != nil {
+		t.Errorf("Problem retrieving publisher %v ID", origName)
+	}
+
+	newName := "NavPress"
+
+	updatedName, err := updatePublisherName(db, origId, newName)
+	if err != nil {
+		t.Errorf("Problem updating publisher: %v", err)
+	}
+	if updatedName != newName {
+		t.Errorf("Publisher name not updated. Expected %v, got %v",
+			newName, updatedName)
+	}
+
+	newId, err := publisherId(db, newName)
+	if err != nil {
+		t.Errorf("Couldn't get id of new publisher name %v: %v", newName, err)
+	}
+	if newId != origId {
+		t.Errorf("Publisher name added instead of updated. Expected id %v but got %v",
+			origId, newId)
+	}
+
+	// Revert to original state
+	updatedName, err = updatePublisherName(db, origId, origName)
+	if err != nil {
+		t.Errorf("Problem reverting publisher: %v", err)
+	}
+	if updatedName != origName {
+		t.Errorf("Publisher name not reverted. Expected %v, got %v",
+			origName, updatedName)
+	}
+	
+}
+
+func TestUpdatePublisherNameEmptyString(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	var newName string = ""
+	_, err = updatePublisherName(db, 1, newName)
+	if err == nil {
+		t.Errorf("Empty publisher string did not raise error")
+	}
+}
+
+func TestUpdatePublisherNameDuplicate(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	var newName string = "Hackett"
+	_, err = updatePublisherName(db, 1, newName)
+	if err == nil {
+		t.Errorf("Duplicate publisher name did not raise error")
+	}
+}
+
 // [todo] test modification of isbn
 // [todo] test modification of series by id (including trying invalid ids)
 // [todo] test modification of series by name (including empty string for NULL)

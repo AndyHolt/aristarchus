@@ -788,7 +788,26 @@ func updatePersonName(db DBInterface, id int, newName string) (string, error) {
 	return updatedName, nil
 }
 
+type EmptyTitleError struct {
+	Id    int
+	Title string
+}
+
+func (e *EmptyTitleError) Error() string {
+	return fmt.Sprintf("updateBookTitle: Can't set empty title. Book #%v, \"%v\"",
+		e.Id, e.Title)
+}
+
 func updateBookTitle(db DBInterface, id int, title string) (string, error) {
+	if len(title) == 0 {
+		var b Book
+		b, err := getBookById(db, id)
+		if err != nil {
+			return b.title, fmt.Errorf("updateBookTitle, Empty book title, could not get original title: %v", err)
+		}
+		return b.title, &EmptyTitleError{id, b.title}
+	}
+
 	sqlStmt := `
       UPDATE books
       SET title = ?
@@ -906,20 +925,61 @@ func updateBookEdition(db DBInterface, id int, edition int) (int, error) {
 	return int(updatedEdition.Int64), nil
 }
 
+type InvalidPublisherIdError struct {
+	CallFunc    string
+	PublisherId int
+}
+
+func (e *InvalidPublisherIdError) Error() string {
+	return fmt.Sprintf("%v: Publisher ID #%v is invalid, not a known ID",
+		e.CallFunc, e.PublisherId)
+}
+
 func updateBookPublisherById(db DBInterface, id int, publisher int) (int, error) {
+	b, err := getBookById(db, id)
+	if err != nil {
+		return 0, fmt.Errorf("updateBookPublisherById: could not get book id #%v: %v", id, err)
+	}
+	origPublisherId, err := publisherId(db, b.publisher)
+	if err != nil {
+		return 0, fmt.Errorf("updateBookPublisherById: Could not get book id #%v original publisher id, %v",
+			id, err)
+	}
+
+	checkPubIdSql := "SELECT publisher_id FROM publishers WHERE publisher_id = ?"
+	rows, err := db.Query(checkPubIdSql, publisher)
+	if err != nil {
+		return origPublisherId, fmt.Errorf("updateBookPublisherById, Could not retrieve publisher id #%v from database: %v",
+			publisher, err)
+	}
+	defer rows.Close()
+	if rows.Next() {
+		var pubIdFromDb int
+		if err := rows.Scan(&pubIdFromDb); err != nil {
+			return origPublisherId, fmt.Errorf("updateBookPublisherById: Could not retrieve publisher id #%v from database: %v", publisher, err)
+		}
+	} else {
+		if err := rows.Err(); err != nil {
+			return origPublisherId, fmt.Errorf("updateBookPublisherById: Unexpected error retrieving publisher id #%v from database, %v", publisher, err)
+		} else {
+			return origPublisherId, &InvalidPublisherIdError{"updateBookPublisherById", publisher}
+		}
+	}
+	rows.Close()
+
 	sqlStmt := `
         UPDATE books
         SET publisher_id = ?
         WHERE book_id = ?
     `
-	_, err := db.Exec(sqlStmt, publisher, id)
+	_, err = db.Exec(sqlStmt, publisher, id)
 	if err != nil {
 		return 0, fmt.Errorf("updateBookPublisherById, Couldn't update book #%v to have publisher id #%v: %v",
 			id, publisher, err)
 	}
 
 	var updatedPublisher int
-	if err := db.QueryRow("SELECT publisher_id FROM books WHERE id = ?",
+	if err := db.QueryRow("SELECT publisher_id FROM books WHERE book_id = ?",
 		id).Scan(&updatedPublisher); err != nil {
 		return 0, fmt.Errorf("updatedBookPublisherById, Couldn't retrieve updated publisher, %v", err)
 	}
@@ -932,6 +992,10 @@ func updateBookPublisherById(db DBInterface, id int, publisher int) (int, error)
 }
 
 func updateBookPublisherByName(db DBInterface, id int, publisher string) (string, error) {
+	if len(publisher) == 0 {
+		return "", fmt.Errorf("updateBookPublisherByName: Cannot have empty publisher name")
+	}	
+
 	sqlStmt := `
         UPDATE books
         SET publisher_id = ?
@@ -972,13 +1036,29 @@ func updateBookPublisherByName(db DBInterface, id int, publisher string) (string
 }
 
 func updatePublisherName(db DBInterface, id int, name string) (string, error) {
+	if len(name) == 0 {
+		return "", fmt.Errorf("Publisher cannot have empty name")
+	}
+
+	// check if new name is already a publisher
+	sqlCheckPublisher := "SELECT name FROM publishers WHERE name = ?"
+	rows, err := db.Query(sqlCheckPublisher, name)
+	if err != nil {
+		return "", fmt.Errorf("Couldn't check database for duplicate name: %v", err)
+	}
+	defer rows.Close()
+	if rows.Next() {
+		return "", fmt.Errorf("updatePublisherName: Publisher %v already exists", name)
+	}
+	rows.Close()
+
 	sqlStmt := `
         UPDATE publishers
         SET name = ?
         WHERE publisher_id = ?
     `
 
-	_, err := db.Exec(sqlStmt, name, id)
+	_, err = db.Exec(sqlStmt, name, id)
 	if err != nil {
 		return "", fmt.Errorf("updatePublisherName, Couldn't update publisher name: %v", err)
 	}
@@ -1505,71 +1585,71 @@ func main() {
 	// 	newEditors)
 
 	//   [done] Modify a person's name function
-	fmt.Printf("\n*** Testing modification of person's name ***\n")
-	booksByAuthorIdSql := `
-      SELECT author_id, name, title
-      FROM books
-      INNER JOIN book_author
-        ON books.book_id = book_author.book_id
-      INNER JOIN people
-        ON book_author.author_id = people.person_id
-      WHERE author_id = ?
-      `
+	// fmt.Printf("\n*** Testing modification of person's name ***\n")
+	// booksByAuthorIdSql := `
+	//   SELECT author_id, name, title
+	//   FROM books
+	//   INNER JOIN book_author
+	//     ON books.book_id = book_author.book_id
+	//   INNER JOIN people
+	//     ON book_author.author_id = people.person_id
+	//   WHERE author_id = ?
+	//   `
 
-	rows, err := db.Query(booksByAuthorIdSql, 3)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer rows.Close()
-	fmt.Printf("Books by author with person_id #3:\n")
-	for rows.Next() {
-		var authorId int
-		var authorName string
-		var bookTitle string
-		if scanErr := rows.Scan(&authorId, &authorName, &bookTitle); scanErr != nil {
-			log.Fatal(err)
-		}
-		fmt.Printf("person_id: %v, name: %v, book title: %v\n", authorId,
-			authorName, bookTitle)
-	}
+	// rows, err := db.Query(booksByAuthorIdSql, 3)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer rows.Close()
+	// fmt.Printf("Books by author with person_id #3:\n")
+	// for rows.Next() {
+	// 	var authorId int
+	// 	var authorName string
+	// 	var bookTitle string
+	// 	if scanErr := rows.Scan(&authorId, &authorName, &bookTitle); scanErr != nil {
+	// 		log.Fatal(err)
+	// 	}
+	// 	fmt.Printf("person_id: %v, name: %v, book title: %v\n", authorId,
+	// 		authorName, bookTitle)
+	// }
 
-	updatePersonName(db, 3, "Geoffrey Parker Jr.")
+	// updatePersonName(db, 3, "Geoffrey Parker Jr.")
 
-	rows, err = db.Query(booksByAuthorIdSql, 3)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer rows.Close()
-	fmt.Printf("Books by author with person_id #3:\n")
-	for rows.Next() {
-		var authorId int
-		var authorName string
-		var bookTitle string
-		if scanErr := rows.Scan(&authorId, &authorName, &bookTitle); scanErr != nil {
-			log.Fatal(err)
-		}
-		fmt.Printf("person_id: %v, name: %v, book title: %v\n", authorId,
-			authorName, bookTitle)
-	}
+	// rows, err = db.Query(booksByAuthorIdSql, 3)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer rows.Close()
+	// fmt.Printf("Books by author with person_id #3:\n")
+	// for rows.Next() {
+	// 	var authorId int
+	// 	var authorName string
+	// 	var bookTitle string
+	// 	if scanErr := rows.Scan(&authorId, &authorName, &bookTitle); scanErr != nil {
+	// 		log.Fatal(err)
+	// 	}
+	// 	fmt.Printf("person_id: %v, name: %v, book title: %v\n", authorId,
+	// 		authorName, bookTitle)
+	// }
 
-	updatePersonName(db, 3, "Peter J. Gentry")
+	// updatePersonName(db, 3, "Peter J. Gentry")
 
-	rows, err = db.Query(booksByAuthorIdSql, 3)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer rows.Close()
-	fmt.Printf("Books by author with person_id #3:\n")
-	for rows.Next() {
-		var authorId int
-		var authorName string
-		var bookTitle string
-		if scanErr := rows.Scan(&authorId, &authorName, &bookTitle); scanErr != nil {
-			log.Fatal(err)
-		}
-		fmt.Printf("person_id: %v, name: %v, book title: %v\n", authorId,
-			authorName, bookTitle)
-	}
+	// rows, err = db.Query(booksByAuthorIdSql, 3)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer rows.Close()
+	// fmt.Printf("Books by author with person_id #3:\n")
+	// for rows.Next() {
+	// 	var authorId int
+	// 	var authorName string
+	// 	var bookTitle string
+	// 	if scanErr := rows.Scan(&authorId, &authorName, &bookTitle); scanErr != nil {
+	// 		log.Fatal(err)
+	// 	}
+	// 	fmt.Printf("person_id: %v, name: %v, book title: %v\n", authorId,
+	// 		authorName, bookTitle)
+	// }
 
 	//   [done] Modify title function
 	fmt.Printf("\n*** Testing modification of book title ***\n")
