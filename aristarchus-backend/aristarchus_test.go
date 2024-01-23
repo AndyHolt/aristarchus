@@ -213,7 +213,8 @@ func TestBookStringMethod(t *testing.T) {
 	bkStr := b.String()
 
 	if bkStr != expected {
-		t.Errorf("Wrong value returned by String method on Book: expected %v, got %v", expected, bkStr)
+		t.Errorf("Wrong value returned by String method on Book: expected %v, got %v",
+			expected, bkStr)
 	}
 }
 
@@ -259,13 +260,19 @@ func TestGetListOfBookIDs(t *testing.T) {
 	// compared to nil. So need to check lengths
 
 	if len(returnedIDs) != len(expectedIDs) {
-		t.Errorf("getListOfBookIDs returned unexpected value (different lengths). Expected %v, got %v",
-			expectedIDs, returnedIDs)
+		t.Errorf(
+			"getListOfBookIDs returned unexpected value (different lengths).\n"+
+				"Expected %v, got %v",
+			expectedIDs, returnedIDs,
+		)
 	}
 	for i := range expectedIDs {
 		if returnedIDs[i] != expectedIDs[i] {
-			t.Errorf("getListOfBookIDs returned unexpected value (different value at index %v). Expected %v, got %v",
-				i, expectedIDs, returnedIDs)
+			t.Errorf(
+				"getListOfBookIDs returned unexpected value "+
+					"(different value at index %v). Expected %v, got %v",
+				i, expectedIDs, returnedIDs,
+			)
 		}
 	}
 }
@@ -278,8 +285,11 @@ func TestFormatNameListEmpty(t *testing.T) {
 	returned := formatNameList(nameList)
 
 	if returned != expected {
-		t.Errorf("formatNameList returned unexpected value for input \"%v\". Expected \"%v\" but got \"%v\"",
-			nameList, expected, returned)
+		t.Errorf(
+			"formatNameList returned unexpected value for input \"%v\". "+
+				"Expected \"%v\" but got \"%v\"",
+			nameList, expected, returned,
+		)
 	}
 }
 
@@ -291,8 +301,11 @@ func TestFormatNameListSingle(t *testing.T) {
 	returned := formatNameList(nameList)
 
 	if returned != expected {
-		t.Errorf("formatNameList returned unexpected value for input \"%v\". Expected \"%v\" but got \"%v\"",
-			nameList, expected, returned)
+		t.Errorf(
+			"formatNameList returned unexpected value for input \"%v\".\n"+
+				"Expected \"%v\" but got \"%v\"",
+			nameList, expected, returned,
+		)
 	}
 }
 
@@ -304,34 +317,52 @@ func TestFormatNameListDouble(t *testing.T) {
 	returned := formatNameList(nameList)
 
 	if returned != expected {
-		t.Errorf("formatNameList returned unexpected value for input \"%v\". Expected \"%v\" but got \"%v\"",
-			nameList, expected, returned)
+		t.Errorf(
+			"formatNameList returned unexpected value for input \"%v\".\n"+
+				"Expected \"%v\" but got \"%v\"",
+			nameList, expected, returned,
+		)
 	}
 }
 
 func TestFormatNameListTriple(t *testing.T) {
 	expected := "Peter J. Gentry, Stephen J. Wellum and Thomas R. Schreiner"
 
-	var nameList = []string{"Peter J. Gentry", "Stephen J. Wellum", "Thomas R. Schreiner"}
+	var nameList = []string{
+		"Peter J. Gentry",
+		"Stephen J. Wellum",
+		"Thomas R. Schreiner",
+	}
 
 	returned := formatNameList(nameList)
 
 	if returned != expected {
-		t.Errorf("formatNameList returned unexpected value for input \"%v\". Expected \"%v\" but got \"%v\"",
-			nameList, expected, returned)
+		t.Errorf(
+			"formatNameList returned unexpected value for input \"%v\".\n"+
+				"Expected \"%v\" but got \"%v\"",
+			nameList, expected, returned,
+		)
 	}
 }
 
 func TestFormatNameListQuadruple(t *testing.T) {
 	expected := "Peter J. Gentry, Stephen J. Wellum, Thomas R. Schreiner and Michael A. G. Haykin"
 
-	var nameList = []string{"Peter J. Gentry", "Stephen J. Wellum", "Thomas R. Schreiner", "Michael A. G. Haykin"}
+	var nameList = []string{
+		"Peter J. Gentry",
+		"Stephen J. Wellum",
+		"Thomas R. Schreiner",
+		"Michael A. G. Haykin",
+	}
 
 	returned := formatNameList(nameList)
 
 	if returned != expected {
-		t.Errorf("formatNameList returned unexpected value for input \"%v\". Expected \"%v\" but got \"%v\"",
-			nameList, expected, returned)
+		t.Errorf(
+			"formatNameList returned unexpected value for input \"%v\".\n"+
+				"Expected \"%v\" but got \"%v\"",
+			nameList, expected, returned,
+		)
 	}
 }
 
@@ -342,101 +373,232 @@ func TestNameListFromStringEmpty(t *testing.T) {
 
 	returned := nameListFromString(nameString)
 
-    if len(returned) != len(expected) {
-		t.Errorf("nameListFromString returned unexpected value (slice length).\nExpected %v,\nbut got %v",
-		    expected, returned)
+	if len(returned) != len(expected) {
+		t.Errorf(
+			"nameListFromString returned unexpected value (slice length).\n"+
+				"Expected %v,\nbut got %v",
+			expected, returned,
+		)
 	}
 
 	for i := range expected {
 		if returned[i] != expected[i] {
-			t.Errorf("nameListFromString returned unexpected value for slice element %v.\nExpected \"%v\", but got \"%v\".\nExpected slice %v,\nbut got slice %v",
-				i, expected[i], returned[i], expected, returned)
+			t.Errorf(
+				"nameListFromString returned unexpected value for slice element %v.\n"+
+					"Expected \"%v\", but got \"%v\".\nExpected slice %v,\nbut got slice %v",
+				i, expected[i], returned[i], expected, returned,
+			)
 		}
 	}
 }
 
 func TestNameListFromStringSingle(t *testing.T) {
-    var expected = []string{"Peter J. Gentry"}
+	var expected = []string{"Peter J. Gentry"}
 
 	nameString := "Peter J. Gentry"
 
 	returned := nameListFromString(nameString)
 
-    if len(returned) != len(expected) {
-		t.Errorf("nameListFromString returned unexpected value (slice length).\nExpected %v,\nbut got %v",
-		    expected, returned)
+	if len(returned) != len(expected) {
+		t.Errorf(
+			"nameListFromString returned unexpected value (slice length).\n"+
+				"Expected %v,\nbut got %v",
+			expected, returned,
+		)
 	}
 
 	for i := range expected {
 		if returned[i] != expected[i] {
-			t.Errorf("nameListFromString returned unexpected value for slice element %v.\nExpected \"%v\", but got \"%v\".\nExpected slice %v,\nbut got slice %v",
-				i, expected[i], returned[i], expected, returned)
+			t.Errorf(
+				"nameListFromString returned unexpected value for slice element %v.\n"+
+					"Expected \"%v\", but got \"%v\".\nExpected slice %v,\nbut got slice %v",
+				i, expected[i], returned[i], expected, returned,
+			)
 		}
 	}
 }
 
 func TestNameListFromStringDouble(t *testing.T) {
-    var expected = []string{"Peter J. Gentry", "Stephen J. Wellum"}
+	var expected = []string{"Peter J. Gentry", "Stephen J. Wellum"}
 
 	nameString := "Peter J. Gentry and Stephen J. Wellum"
 
 	returned := nameListFromString(nameString)
 
-    if len(returned) != len(expected) {
-		t.Errorf("nameListFromString returned unexpected value (slice length).\nExpected %v,\nbut got %v",
-		    expected, returned)
+	if len(returned) != len(expected) {
+		t.Errorf(
+			"nameListFromString returned unexpected value (slice length).\n"+
+				"Expected %v,\nbut got %v",
+			expected, returned,
+		)
 	}
 
 	for i := range expected {
 		if returned[i] != expected[i] {
-			t.Errorf("nameListFromString returned unexpected value for slice element %v.\nExpected \"%v\", but got \"%v\".\nExpected slice %v,\nbut got slice %v",
-				i, expected[i], returned[i], expected, returned)
+			t.Errorf(
+				"nameListFromString returned unexpected value for slice element %v.\n"+
+					"Expected \"%v\", but got \"%v\".\nExpected slice %v,\nbut got slice %v",
+				i, expected[i], returned[i], expected, returned,
+			)
 		}
 	}
 }
 
 func TestNameListFromStringTriple(t *testing.T) {
-	var expected = []string{"Peter J. Gentry", "Stephen J. Wellum", "Thomas R. Schreiner"}
+	var expected = []string{
+		"Peter J. Gentry",
+		"Stephen J. Wellum",
+		"Thomas R. Schreiner",
+	}
 
 	nameString := "Peter J. Gentry, Stephen J. Wellum and Thomas R. Schreiner"
 
 	returned := nameListFromString(nameString)
 
-    if len(returned) != len(expected) {
-		t.Errorf("nameListFromString returned unexpected value (slice length).\nExpected %v,\nbut got %v",
-		    expected, returned)
+	if len(returned) != len(expected) {
+		t.Errorf(
+			"nameListFromString returned unexpected value (slice length).\n"+
+				"Expected %v,\nbut got %v",
+			expected, returned,
+		)
 	}
 
 	for i := range expected {
 		if returned[i] != expected[i] {
-			t.Errorf("nameListFromString returned unexpected value for slice element %v.\nExpected \"%v\", but got \"%v\".\nExpected slice %v,\nbut got slice %v",
-				i, expected[i], returned[i], expected, returned)
+			t.Errorf(
+				"nameListFromString returned unexpected value for slice element %v.\n"+
+					"Expected \"%v\", but got \"%v\".\n"+
+					"Expected slice %v,\nbut got slice %v",
+				i, expected[i], returned[i], expected, returned,
+			)
 		}
-	}	
+	}
 }
 
 func TestNameListFromStringQuadruple(t *testing.T) {
-	var expected = []string{"Peter J. Gentry", "Stephen J. Wellum", "Thomas R. Schreiner", "Michael A. G. Haykin"}
+	var expected = []string{
+		"Peter J. Gentry",
+		"Stephen J. Wellum",
+		"Thomas R. Schreiner",
+		"Michael A. G. Haykin",
+	}
 
-	nameString := "Peter J. Gentry, Stephen J. Wellum, Thomas R. Schreiner and Michael A. G. Haykin"
+	nameString := "Peter J. Gentry, Stephen J. Wellum, " +
+                  "Thomas R. Schreiner and Michael A. G. Haykin"
 
 	returned := nameListFromString(nameString)
 
-    if len(returned) != len(expected) {
-		t.Errorf("nameListFromString returned unexpected value (slice length).\nExpected %v,\nbut got %v",
-		    expected, returned)
+	if len(returned) != len(expected) {
+		t.Errorf(
+			"nameListFromString returned unexpected value (slice length).\n"+
+				"Expected %v,\nbut got %v",
+			expected, returned,
+		)
 	}
 
 	for i := range expected {
 		if returned[i] != expected[i] {
-			t.Errorf("nameListFromString returned unexpected value for slice element %v.\nExpected \"%v\", but got \"%v\".\nExpected slice %v,\nbut got slice %v",
-				i, expected[i], returned[i], expected, returned)
+			t.Errorf(
+				"nameListFromString returned unexpected value for slice element %v.\n"+
+					"Expected \"%v\", but got \"%v\".\nExpected slice %v,\nbut got slice %v",
+				i, expected[i], returned[i], expected, returned,
+			)
 		}
 	}
 }
 
 // [todo]  test GetAuthorsListById function
+func TestGetAuthorsListById(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	var expected = []string{"Peter J. Gentry", "Stephen J. Wellum"}
+
+	returned, err := getAuthorsListById(db, 5)
+	if err != nil {
+		t.Errorf("Could not get authors list for book id #%v: %v", 5, err)
+	}
+	if len(returned) != len(expected) {
+		t.Errorf(
+			"getAuthorsListById returned unexpected value (slice length)\n"+
+				"Expected slice of length %v, but got %v.\n"+
+				"Expected slice is %v, returned slice is %v",
+			len(expected), len(returned), expected, returned,
+		)
+	}
+	for i := range expected {
+		if returned[i] != expected[i] {
+			t.Errorf(
+				"getAuthorsById returned unexpected value for slice element %v\n" +
+				"Expected \"%v\", got \"%v\"\n" +
+				"Expected slice is: %v\n" +
+				"Returned slice is: %v",
+				i, expected[i], returned[i], expected, returned,
+			)
+		}
+	}
+}
+
+func TestGetAuthorsListByIdEmpty(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	var expected = []string{}
+
+	returned, err := getAuthorsListById(db, 2)
+	if err != nil {
+		t.Errorf("Error getting authors list: %v", err)
+	}
+	if len(returned) != len(expected) {
+		t.Errorf(
+			"getAuthorsListById returned unexpected value (slice length)\n"+
+				"Expected slice of length %v, but got %v.\n"+
+				"Expected slice is %v, returned slice is %v",
+			len(expected), len(returned), expected, returned,
+		)
+	}
+	for i := range expected {
+		if returned[i] != expected[i] {
+			t.Errorf(
+				"getAuthorsById returned unexpected value for slice element %v\n" +
+				"Expected \"%v\", got \"%v\"\n" +
+				"Expected slice is: %v\n" +
+				"Returned slice is: %v",
+				i, expected[i], returned[i], expected, returned,
+			)
+		}
+	}
+}
+
+func TestGetAuthorsListByIdInvalidId(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	returned, err := getAuthorsListById(db, 17)
+	if err == nil {
+		t.Errorf("Requesting invalid ID did not return error")
+	} else {
+		var ibie *InvalidBookIdError
+		if !errors.As(err, &ibie) {
+			t.Errorf("Requesting invalid ID returned unexpected error: %v", err)
+		}
+	}
+	if len(returned) != 0 {
+		t.Errorf("Non-empty slice returned: %v", returned)
+	}
+}
+
 // [todo]  test GetEditorsListById function
+// [todo]  test BookIDValid function
 // [todo]  test GetBookById function
 // [todo]  test PersonId function
 // [todo]  test PublisherId function

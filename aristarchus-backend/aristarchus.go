@@ -229,6 +229,17 @@ func nameListFromString(nameString string) []string {
 }
 
 func getAuthorsListById(db DBInterface, id int) ([]string, error) {
+	bookValid, err := BookIDValid(db, id)
+	if err != nil {
+		return []string{}, fmt.Errorf(
+			"getAuthorsListById, could not validate book id #%v: %v",
+			id, err,
+		)
+	}
+	if !bookValid {
+		return []string{}, &InvalidBookIdError{"getAuthorsListById", id}
+	}
+
 	var authors []string
 	sqlStmt := `
           SELECT people.name
@@ -285,7 +296,41 @@ func getEditorsListById(db DBInterface, id int) ([]string, error) {
 	return editors, nil
 }
 
+type InvalidBookIdError struct {
+	CallFunc string
+	BookId int
+}
+
+func (e *InvalidBookIdError) Error() string {
+    return fmt.Sprintf("%v: Unknown book ID #%v", e.CallFunc, e.BookId)
+}
+
+func BookIDValid(db DBInterface, id int) (bool, error) {
+    sqlStmt := `
+        SELECT COUNT(*)
+        FROM books
+        WHERE book_id = ?`
+
+	var count int
+	if err := db.QueryRow(sqlStmt, id).Scan(&count); err != nil {
+		return false, fmt.Errorf("BookIDValid, problem reading from DB: %v", err)
+	}
+	if count == 1 {
+		return true, nil
+	} else {
+		return false, nil
+	}
+}
+
 func getBookById(db DBInterface, id int) (Book, error) {
+	bookValid, err := BookIDValid(db, id)
+	if err != nil {
+		return Book{}, fmt.Errorf("getBookById, could not validate id #%v: %v", id, err)
+	}
+	if !bookValid {
+		return Book{}, &InvalidBookIdError{"getBookById", id}
+	}
+
 	var b Book
 	b.id = id
 
@@ -307,7 +352,7 @@ func getBookById(db DBInterface, id int) (Book, error) {
 	if err := row.Scan(&b.title, &subtitle, &b.year, &edition,
 		&b.publisher, &b.isbn, &seriesName, &b.status, &purDate); err != nil {
 		if err == sql.ErrNoRows {
-			return b, fmt.Errorf("getBookById %d: No such book", id)
+			return b, &InvalidBookIdError{"getBookById", id}
 		}
 		return b, fmt.Errorf("getBookById %d: %v", id, err)
 	}
@@ -326,7 +371,7 @@ func getBookById(db DBInterface, id int) (Book, error) {
 	}
 
 	var authorList []string
-	authorList, err := getAuthorsListById(db, id)
+	authorList, err = getAuthorsListById(db, id)
 	if err != nil {
 		log.Fatal(err)
 	}
