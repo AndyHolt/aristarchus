@@ -446,7 +446,6 @@ func TestUpdateBookEditor(t *testing.T) {
 	}
 }
 
-// [todo] test modification of person's name
 func TestUpdatePersonName(t *testing.T) {
 	db, err := sql.Open("sqlite3", "testdb.sqlite")
 	if err != nil {
@@ -839,7 +838,6 @@ func TestUpdateBookEditionZero(t *testing.T) {
 	}
 }
 
-// [todo] test modification of book publisher by id (try invalid ids)
 func TestUpdateBookPublisherById(t *testing.T) {
 	db, err := sql.Open("sqlite3", "testdb.sqlite")
 	if err != nil {
@@ -942,7 +940,6 @@ func TestUpdateBookPublisherByIdInvalid(t *testing.T) {
 	}
 }
 
-// [todo] test modification of book publisher by name
 func TestUpdateBookPublisherByName(t *testing.T) {
 	db, err := sql.Open("sqlite3", "testdb.sqlite")
 	if err != nil {
@@ -1023,9 +1020,8 @@ func TestUpdateBookPublisherByNameEmptyString(t *testing.T) {
 	}
 }
 
-// [todo] test modification of publisher name
 func TestUpdatePublisherName(t *testing.T) {
-    db, err := sql.Open("sqlite3", "testdb.sqlite")
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
 	if err != nil {
 		t.Errorf("Problem opening database: %v", err)
 	}
@@ -1066,7 +1062,7 @@ func TestUpdatePublisherName(t *testing.T) {
 		t.Errorf("Publisher name not reverted. Expected %v, got %v",
 			origName, updatedName)
 	}
-	
+
 }
 
 func TestUpdatePublisherNameEmptyString(t *testing.T) {
@@ -1097,12 +1093,721 @@ func TestUpdatePublisherNameDuplicate(t *testing.T) {
 	}
 }
 
-// [todo] test modification of isbn
-// [todo] test modification of series by id (including trying invalid ids)
-// [todo] test modification of series by name (including empty string for NULL)
-// [todo] test modification of series name (including error for empty string)
-// [todo] test modification of status function (empty string?)
-// [todo] test modification of purchased function (empty for NULL)
+func TestUpdateBookIsbn(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	origIsbn := "0-85111-723-6"
+	newIsbn := "978-1408855652"
+
+	updatedIsbn, err := updateBookIsbn(db, 1, newIsbn)
+	if err != nil {
+		t.Errorf("Problem updating ISBN: %v", err)
+	}
+	if updatedIsbn != newIsbn {
+		t.Errorf("ISBN not updated. Expected %v, got %v", newIsbn, updatedIsbn)
+	}
+
+	b, err := getBookById(db, 1)
+	if err != nil {
+		t.Errorf("Problem reading book from database: %v", err)
+	}
+	if b.isbn != newIsbn {
+		t.Errorf("ISBN not properly updated. Expected %v, got %v", newIsbn, b.isbn)
+	}
+
+	// Revert to original state
+	revertedIsbn, err := updateBookIsbn(db, 1, origIsbn)
+	if err != nil {
+		t.Errorf("Problem reverting ISBN: %v", err)
+	}
+	if revertedIsbn != origIsbn {
+		t.Errorf("ISBN not reverted. Expected %v, got %v",
+			origIsbn, revertedIsbn)
+	}
+}
+
+func TestUpdateBookSeriesById(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	origId := 1
+	origName := "Spectrum Multiview Books"
+
+	// Add an extra series
+	seriesName := "New Studies in Biblical Theology"
+	newId, err := seriesId(db, seriesName)
+	if err != nil {
+		t.Errorf("Problem creating new series: %v", err)
+	}
+
+	updatedId, err := updateBookSeriesById(db, 2, newId)
+	if err != nil {
+		t.Errorf("Problem updating series id: %v", err)
+	}
+	if updatedId != newId {
+		t.Errorf("Series id not updated. Expected %v, got %v", newId, updatedId)
+	}
+
+	b, err := getBookById(db, 2)
+	if err != nil {
+		t.Errorf("Problem getting book from database: %v", err)
+	}
+	if b.series != seriesName {
+		t.Errorf("Series not properly updated. Expected %v, got %v", seriesName,
+			b.series)
+	}
+
+	// revert
+	revertedId, err := updateBookSeriesById(db, 2, origId)
+	if err != nil {
+		t.Errorf("Problem updating series id: %v", err)
+	}
+	if revertedId != origId {
+		t.Errorf("Series id not reverted. Expected %v, got %v", origId, revertedId)
+	}
+
+	b, err = getBookById(db, 2)
+	if err != nil {
+		t.Errorf("Problem getting book from database: %v", err)
+	}
+	if b.series != origName {
+		t.Errorf("Series not properly updated. Expected %v, got %v", origName,
+			b.series)
+	}
+
+	// clean up by deleting added series
+	err = deleteSeries(db, newId)
+	if err != nil {
+		t.Errorf("Problem removing series to revert database: %v", err)
+	}
+}
+
+func TestUpdateBookSeriesByIdNull(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	origId := 1
+	origName := "Spectrum Multiview Books"
+
+	newId := 0
+	seriesName := ""
+
+	updatedId, err := updateBookSeriesById(db, 2, newId)
+	if err != nil {
+		t.Errorf("Problem setting null series id: %v", err)
+	}
+	if updatedId != newId {
+		t.Errorf("Series id not correctly updated. Expected %v, got %v", newId, updatedId)
+	}
+
+	b, err := getBookById(db, 2)
+	if err != nil {
+		t.Errorf("Problem getting book from database: %v", err)
+	}
+	if b.series != seriesName {
+		t.Errorf("Series not properly updated. Expected %v, got %v", seriesName,
+			b.series)
+	}
+
+	// check that database value is NULL, not simply set to id zero and empty
+	// string name
+
+	// check for non-null subtitles: error if any found
+	sqlStmt := `
+      SELECT series_id
+      FROM books
+      WHERE book_id = ? AND series_id IS NOT NULL
+    `
+	var readSeriesId sql.NullInt64
+	rows, err := db.Query(sqlStmt, 2)
+	if err != nil {
+		t.Errorf("Error querying subtitle in database: %v", err)
+	}
+	defer rows.Close()
+	if rows.Next() {
+		if err := rows.Scan(&readSeriesId); err != nil {
+			t.Errorf("Issue scanning row: %v", err)
+		}
+		t.Errorf("Query returned non-null value \"%v\"", readSeriesId)
+	} else {
+		if err := rows.Err(); err != nil {
+			t.Errorf("rows.Next() failed with non-nil error: %v", err)
+		}
+	}
+
+	// check for null subtitle: error if none found
+	sqlStmt = `
+      SELECT series_id
+      FROM books
+      WHERE book_id = ? AND series_id IS NULL
+    `
+	rows, err = db.Query(sqlStmt, 2)
+	if err != nil {
+		t.Errorf("Querying subtitle in database: %v", err)
+	}
+	defer rows.Close()
+	if rows.Next() {
+		if err := rows.Scan(&readSeriesId); err != nil {
+			t.Errorf("Issue scanning row: %v", err)
+		}
+		if readSeriesId.Valid {
+			t.Errorf("Query returned valid series id: \"%v\"", readSeriesId.Int64)
+		}
+	} else {
+		t.Errorf("rows.Next() failed with err: %v", rows.Err())
+	}
+	// Now we need to explicitly close rows to unlock the database for reversion
+	// to original values. We can't wait for the deferred function to take
+	// effect.
+	rows.Close()
+
+	// revert
+	revertedId, err := updateBookSeriesById(db, 2, origId)
+	if err != nil {
+		t.Errorf("Problem updating series id: %v", err)
+	}
+	if revertedId != origId {
+		t.Errorf("Series id not reverted. Expected %v, got %v", origId, revertedId)
+	}
+
+	b, err = getBookById(db, 2)
+	if err != nil {
+		t.Errorf("Problem getting book from database: %v", err)
+	}
+	if b.series != origName {
+		t.Errorf("Series not properly updated. Expected %v, got %v", origName,
+			b.series)
+	}
+}
+
+func TestUpdateBookSeriesByIdInvalid(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	origId := 1
+	origName := "Spectrum Multiview Books"
+
+	// Add an extra series
+	invalidId := 2
+
+	updatedId, err := updateBookSeriesById(db, 2, invalidId)
+	if err != nil {
+		var invSerId *InvalidSeriesIdError
+		if !errors.As(err, &invSerId) {
+			t.Errorf("Unexpected error updating with invalid series id: %v", err)
+		}
+	} else {
+		t.Errorf("Updating series to invalid ID did not generate error")
+	}
+	if updatedId != origId {
+		t.Errorf("Series id wrongly updated. Expected %v, got %v", origId, updatedId)
+	}
+
+	b, err := getBookById(db, 2)
+	if err != nil {
+		t.Errorf("Problem getting book from database: %v", err)
+	}
+	if b.series != origName {
+		t.Errorf("Series wrongly updated. Expected %v, got %v", origName, b.series)
+	}
+
+	// revert
+	revertedId, err := updateBookSeriesById(db, 2, origId)
+	if err != nil {
+		t.Errorf("Problem updating series id: %v", err)
+	}
+	if revertedId != origId {
+		t.Errorf("Series id not reverted. Expected %v, got %v", origId, revertedId)
+	}
+
+	b, err = getBookById(db, 2)
+	if err != nil {
+		t.Errorf("Problem getting book from database: %v", err)
+	}
+	if b.series != origName {
+		t.Errorf("Series not properly updated. Expected %v, got %v", origName,
+			b.series)
+	}
+}
+
+func TestUpdateBookSeriesByName(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	origName := "Spectrum Multiview Books"
+
+	newName := "New Studies in Biblical Theology"
+
+	updatedName, err := updateBookSeriesByName(db, 2, newName)
+	if err != nil {
+		t.Errorf("Problem updating book series: %v", err)
+	}
+
+	if updatedName != newName {
+		t.Errorf("Series not correctly updated. Expected \"%v\", got \"%v\"",
+			newName, updatedName)
+	}
+
+	b, err := getBookById(db, 2)
+	if err != nil {
+		t.Errorf("Could not get book with ID #%v: %v", 2, err)
+	}
+	if b.series != newName {
+		t.Errorf("Series not correctly updated in database. Expected \"%v\", got \"%v\"", newName, b.series)
+	}
+
+	// revert to original value
+	revertedName, err := updateBookSeriesByName(db, 2, origName)
+	if err != nil {
+		t.Errorf("Problem reverting book series: %v", err)
+	}
+	if revertedName != origName {
+		t.Errorf("Series not correctly reverted. Expected \"%v\", got \"%v\"",
+			origName, revertedName)
+	}
+	b, err = getBookById(db, 2)
+	if err != nil {
+		t.Errorf("Could not get book with ID #%v: %v", 2, err)
+	}
+	if b.series != origName {
+		t.Errorf("Series not correctly reverted in database. Expected \"%v\", got \"%v\"",
+			origName, b.series)
+	}
+
+	newSeriesId, err := seriesId(db, newName)
+	if err != nil {
+		t.Errorf("Could not get ID to delete series \"%v\": %v", newName, err)
+	}
+	deleteSeries(db, newSeriesId)
+}
+
+func TestUpdateBookSeriesByNameEmpty(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	origId := 1
+	origName := "Spectrum Multiview Books"
+
+	newName := ""
+
+	updatedName, err := updateBookSeriesByName(db, 2, newName)
+	if err != nil {
+		t.Errorf("Problem setting empty series name: %v", err)
+	}
+	if updatedName != newName {
+		t.Errorf("Series name not correctly updated. Expected \"%v\", got \"%v\"", newName, updatedName)
+	}
+
+	b, err := getBookById(db, 2)
+	if err != nil {
+		t.Errorf("Problem getting book from database: %v", err)
+	}
+	if b.series != newName {
+		t.Errorf("Book series not properly updated in DB. Expected \"%v\", got \"%v\"",
+			newName, b.series)
+	}
+
+	// check that database value is NULL, not simply set to id zero and empty
+	// string name
+
+	// check for non-null series: error if any found
+	sqlStmt := `
+      SELECT series_id
+      FROM books
+      WHERE book_id = ? AND series_id IS NOT NULL
+    `
+	var readSeriesId sql.NullInt64
+	rows, err := db.Query(sqlStmt, 2)
+	if err != nil {
+		t.Errorf("Error querying subtitle in database: %v", err)
+	}
+	defer rows.Close()
+	if rows.Next() {
+		if err := rows.Scan(&readSeriesId); err != nil {
+			t.Errorf("Issue scanning row: %v", err)
+		}
+		t.Errorf("Query returned non-null value \"%v\"", readSeriesId)
+	} else {
+		if err := rows.Err(); err != nil {
+			t.Errorf("rows.Next() failed with non-nil error: %v", err)
+		}
+	}
+
+	// check for null subtitle: error if none found
+	sqlStmt = `
+      SELECT series_id
+      FROM books
+      WHERE book_id = ? AND series_id IS NULL
+    `
+	rows, err = db.Query(sqlStmt, 2)
+	if err != nil {
+		t.Errorf("Querying subtitle in database: %v", err)
+	}
+	defer rows.Close()
+	if rows.Next() {
+		if err := rows.Scan(&readSeriesId); err != nil {
+			t.Errorf("Issue scanning row: %v", err)
+		}
+		if readSeriesId.Valid {
+			t.Errorf("Query returned valid series id: \"%v\"", readSeriesId.Int64)
+		}
+	} else {
+		t.Errorf("rows.Next() failed with err: %v", rows.Err())
+	}
+	// Now we need to immediately close rows to unlock the database for reversion
+	// to original values. We can't wait for the deferred function to take
+	// effect.
+	rows.Close()
+
+	// revert
+	revertedId, err := updateBookSeriesById(db, 2, origId)
+	if err != nil {
+		t.Errorf("Problem updating series id: %v", err)
+	}
+	if revertedId != origId {
+		t.Errorf("Series id not reverted. Expected %v, got %v", origId, revertedId)
+	}
+
+	b, err = getBookById(db, 2)
+	if err != nil {
+		t.Errorf("Problem getting book from database: %v", err)
+	}
+	if b.series != origName {
+		t.Errorf("Series not properly updated. Expected %v, got %v", origName,
+			b.series)
+	}
+}
+
+func TestUpdateSeriesName(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	origName := "Spectrum Multiview Books"
+	newName := "New Studies in Biblical Theology"
+
+	updatedName, err := updateSeriesName(db, 1, newName)
+	if err != nil {
+		t.Errorf("Problem updating series name: %v", err)
+	}
+
+	if updatedName != newName {
+		t.Errorf("Series name not correctly updated. Expected \"%v\", got \"%v\"",
+			newName, updatedName)
+	}
+
+	b, err := getBookById(db, 2)
+	if err != nil {
+		t.Errorf("Could not get book with ID #%v: %v", 2, err)
+	}
+	if b.series != newName {
+		t.Errorf("Series not correctly updated in database. Expected \"%v\", got \"%v\"", newName, b.series)
+	}
+
+	// revert to original value
+	revertedName, err := updateSeriesName(db, 1, origName)
+	if err != nil {
+		t.Errorf("Problem reverting book series: %v", err)
+	}
+	if revertedName != origName {
+		t.Errorf("Series not correctly reverted. Expected \"%v\", got \"%v\"",
+			origName, revertedName)
+	}
+	b, err = getBookById(db, 2)
+	if err != nil {
+		t.Errorf("Could not get book with ID #%v: %v", 2, err)
+	}
+	if b.series != origName {
+		t.Errorf("Series name not correctly reverted in database. Expected \"%v\", got \"%v\"",
+			origName, b.series)
+	}
+}
+
+func TestUpdateSeriesNameEmptyString(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	origName := "Spectrum Multiview Books"
+	newName := ""
+
+	updatedName, err := updateSeriesName(db, 1, newName)
+	if err == nil {
+		t.Errorf("Setting series name to empty string did not cause error")
+	}
+
+	if updatedName != origName {
+		t.Errorf("Series name incorrectly updated. Expected \"%v\", got \"%v\"",
+			origName, updatedName)
+	}
+
+	b, err := getBookById(db, 2)
+	if err != nil {
+		t.Errorf("Could not get book with ID #%v: %v", 2, err)
+	}
+	if b.series != origName {
+		t.Errorf("Series incorrectly updated in database. Expected \"%v\", got \"%v\"", origName, b.series)
+	}
+}
+
+func TestUpdateBookStatus(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	origStatus := "Owned"
+	newStatus := "Want"
+
+	updatedStatus, err := updateBookStatus(db, 1, newStatus)
+	if err != nil {
+		t.Errorf("Could not update book status: %v", err)
+	}
+	if updatedStatus != newStatus {
+		t.Errorf("UpdateBookStatus returned unexpected value. Expected \"%v\", got \"%v\"",
+			newStatus, updatedStatus)
+	}
+	b, err := getBookById(db, 1)
+	if err != nil {
+		t.Errorf("Could not retrieve book from database: %v", err)
+	}
+	if b.status != newStatus {
+		t.Errorf("Book status not properly updated in database: expected \"%v\", got \"%v\"",
+			newStatus, b.status)
+	}
+
+	// Revert database to original values
+	revertedStatus, err := updateBookStatus(db, 1, origStatus)
+	if err != nil {
+		t.Errorf("Could not revert book status: %v", err)
+	}
+	if revertedStatus != origStatus {
+		t.Errorf("UpdateBookStatus returned unexpected value. Expected \"%v\", got \"%v\"",
+			origStatus, revertedStatus)
+	}
+	b, err = getBookById(db, 1)
+	if err != nil {
+		t.Errorf("Could not retrieve book from database: %v", err)
+	}
+	if b.status != origStatus {
+		t.Errorf("Book status not properly updated in database: expected \"%v\", got \"%v\"",
+			origStatus, b.status)
+	}
+}
+
+func TestUpdateBookStatusEmptyString(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	origStatus := "Owned"
+	newStatus := ""
+
+	_, err = updateBookStatus(db, 1, newStatus)
+	if err == nil {
+		t.Errorf("Book status empty string did not return error")
+	}
+
+	b, err := getBookById(db, 1)
+	if err != nil {
+		t.Errorf("Could not retrieve book from database: %v", err)
+	}
+	if b.status != origStatus {
+		t.Errorf("Book status wrongly updated in database: expected \"%v\", got \"%v\"",
+			origStatus, b.status)
+	}
+}
+
+func TestUpdateBookPurchaseDate(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	origDate := "May 2023"
+	newDate := "19 April 2021"
+
+	var origPD PurchasedDate
+	var newPD PurchasedDate
+
+	err = origPD.setDate(origDate)
+	if err != nil {
+		t.Errorf("Problem setting date with value \"%v\": %v", origDate, err)
+	}
+	err = newPD.setDate(newDate)
+	if err != nil {
+		t.Errorf("Problem setting date with value \"%v\": %v", newDate, err)
+	}
+
+	updatedPD, err := updateBookPurchaseDate(db, 1, newPD)
+	if err != nil {
+		t.Errorf("Could not update purchase date: %v", err)
+	}
+	if updatedPD != newPD {
+		t.Errorf("updateBookPurchaseDate returned unexpected value. Expected \"%v\", got \"%v\"",
+			newPD, updatedPD)
+	}
+
+	b, err := getBookById(db, 1)
+	if err != nil {
+		t.Errorf("Could not retrieve book from database: %v", err)
+	}
+	if b.purchased != newPD {
+		t.Errorf("Purchase date not properly updated in DB. Expected \"%v\" but got \"%v\"",
+			newPD, b.purchased)
+	}
+
+	// Revert database to default state
+	revertedPD, err := updateBookPurchaseDate(db, 1, origPD)
+	if err != nil {
+		t.Errorf("Could not revert purchase date: %v", err)
+	}
+	if revertedPD != origPD {
+		t.Errorf("updateBookPurchaseDate returned unexpected value. Expected \"%v\", got \"%v\"",
+			origPD, revertedPD)
+	}
+
+	b, err = getBookById(db, 1)
+	if err != nil {
+		t.Errorf("Could not retrieve book from database: %v", err)
+	}
+	if b.purchased != origPD {
+		t.Errorf("Purchase date not properly reverted in DB. Expected \"%v\" but got \"%v\"",
+			origPD, b.purchased)
+	}
+}
+
+func TestUpdateBookPurchaseDateNull(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	origDate := "May 2023"
+	var origPD PurchasedDate
+	err = origPD.setDate(origDate)
+	if err != nil {
+		t.Errorf("Could not set date value \"%v\": %v", origDate, err)
+	}
+
+	var newPD PurchasedDate
+
+	updatedPD, err := updateBookPurchaseDate(db, 1, newPD)
+	if err != nil {
+		t.Errorf("Could not update purchased date: %v", err)
+	}
+	if updatedPD != newPD {
+		t.Errorf("updateBookPurchaseDate returned unexpected value. Expected \"%v\", got \"%v\"",
+			newPD, updatedPD)
+	}
+
+	b, err := getBookById(db, 1)
+	if err != nil {
+		t.Errorf("Could not retrieve book from database: %v", err)
+	}
+	if b.purchased != newPD {
+		t.Errorf("Purchase date did not update properly in DB. Expected \"%v\", got \"%v\"",
+			newPD, b.purchased)
+	}
+
+	// check for non-null purchased date: error if any found
+	sqlStmt := `
+      SELECT purchased_date
+      FROM books
+      WHERE book_id = ? AND purchased_date IS NOT NULL
+    `
+	var readPurchasedDate sql.NullString
+	rows, err := db.Query(sqlStmt, 1)
+	if err != nil {
+		t.Errorf("Error querying purchased date in database: %v", err)
+	}
+	defer rows.Close()
+	if rows.Next() {
+		if err := rows.Scan(&readPurchasedDate); err != nil {
+			t.Errorf("Issue scanning row: %v", err)
+		}
+		t.Errorf("Query returned non-null value \"%v\"", readPurchasedDate)
+	} else {
+		if err := rows.Err(); err != nil {
+			t.Errorf("rows.Next() failed with non-nil error: %v", err)
+		}
+	}
+
+	// check for null purchased date: error if none found
+	sqlStmt = `
+      SELECT purchased_date
+      FROM books
+      WHERE book_id = ? AND purchased_date IS NULL
+    `
+	rows, err = db.Query(sqlStmt, 1)
+	if err != nil {
+		t.Errorf("Querying subtitle in database: %v", err)
+	}
+	defer rows.Close()
+	if rows.Next() {
+		if err := rows.Scan(&readPurchasedDate); err != nil {
+			t.Errorf("Issue scanning row: %v", err)
+		}
+		if readPurchasedDate.Valid {
+			t.Errorf("Query returned valid (non-null) purchased date: \"%v\"", readPurchasedDate.String)
+		}
+	} else {
+		t.Errorf("rows.Next() failed with err: %v", rows.Err())
+	}
+	// Now we need to immediately close rows to unlock the database for reversion
+	// to original values. We can't wait for the deferred function to take
+	// effect.
+	rows.Close()
+
+	// Now need to revert database to original state
+	revertedPD, err := updateBookPurchaseDate(db, 1, origPD)
+	if err != nil {
+		t.Errorf("Could not revert purchase date: %v", err)
+	}
+	if revertedPD != origPD {
+		t.Errorf("updateBookPurchaseDate returned unexpected value. Expected \"%v\", got \"%v\"",
+			origPD, revertedPD)
+	}
+
+	b, err = getBookById(db, 1)
+	if err != nil {
+		t.Errorf("Could not retrieve book from database: %v", err)
+	}
+	if b.purchased != origPD {
+		t.Errorf("Purchase date not properly reverted in DB. Expected \"%v\" but got \"%v\"",
+			origPD, b.purchased)
+	}
+
+}
+
 // [todo] test deletion of book by ID
 // [todo] test deletion of person by ID
 // [todo] test deletion of publisher by ID

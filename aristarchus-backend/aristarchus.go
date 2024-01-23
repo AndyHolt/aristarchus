@@ -931,7 +931,7 @@ type InvalidPublisherIdError struct {
 }
 
 func (e *InvalidPublisherIdError) Error() string {
-	return fmt.Sprintf("%v: Publisher ID #%v is invalid, not a known ID",
+	return fmt.Sprintf("%v: Publisher ID #%v is invalid, unknown ID",
 		e.CallFunc, e.PublisherId)
 }
 
@@ -994,7 +994,7 @@ func updateBookPublisherById(db DBInterface, id int, publisher int) (int, error)
 func updateBookPublisherByName(db DBInterface, id int, publisher string) (string, error) {
 	if len(publisher) == 0 {
 		return "", fmt.Errorf("updateBookPublisherByName: Cannot have empty publisher name")
-	}	
+	}
 
 	sqlStmt := `
         UPDATE books
@@ -1104,7 +1104,42 @@ func updateBookIsbn(db DBInterface, id int, isbn string) (string, error) {
 	return updatedIsbn, nil
 }
 
+type InvalidSeriesIdError struct {
+	CallFunc string
+	SeriesId int
+}
+
+func (e *InvalidSeriesIdError) Error() string {
+	return fmt.Sprintf("%v: Series ID #%v is invalid, unknown ID",
+		e.CallFunc, e.SeriesId)
+}
+
 func updateBookSeriesById(db DBInterface, id int, series int) (int, error) {
+	// get book's original series ID, for returning if unchanged
+	sqlBookSeries := `
+        SELECT series_id
+        FROM books
+        WHERE book_id = ?
+    `
+	var origSeriesId sql.NullInt64
+	if err := db.QueryRow(sqlBookSeries, id).Scan(&origSeriesId); err != nil {
+		return 0, fmt.Errorf("Could not get book #%v's original series: %v", id, err)
+	}
+
+	// check that requested series ID is valid, if it isn't zero, which sets
+	// NULL value
+	if series != 0 {
+		sqlCheckSeriesId := `
+        SELECT series_id
+        FROM series
+        WHERE series_id = ?
+    `
+		var validSeriesIdCheck sql.NullInt64
+		if err := db.QueryRow(sqlCheckSeriesId, series).Scan(&validSeriesIdCheck); err != nil {
+			return int(origSeriesId.Int64), &InvalidSeriesIdError{"updateBookSeriesById", series}
+		}
+	}
+
 	var seriesId sql.NullInt64
 
 	if series == 0 {
@@ -1122,7 +1157,7 @@ func updateBookSeriesById(db DBInterface, id int, series int) (int, error) {
 
 	_, err := db.Exec(sqlStmt, seriesId, id)
 	if err != nil {
-		return 0, fmt.Errorf("updateBookSeriesById, Couldn't updated series for book #%v: %v",
+		return 0, fmt.Errorf("updateBookSeriesById, Couldn't update series for book #%v: %v",
 			id, err)
 	}
 
@@ -1150,11 +1185,11 @@ func updateBookSeriesByName(db DBInterface, id int, series string) (string, erro
 		return "", fmt.Errorf("updateBookSeriesByName, Couldn't update series: %v", err)
 	}
 
-	var updatedSeries string
+	var updatedSeries sql.NullString
 	sqlCheckStmt := `
         SELECT series_name
         FROM books
-        INNER JOIN series
+        LEFT JOIN series
           ON books.series_id = series.series_id
         WHERE book_id = ?
     `
@@ -1162,16 +1197,27 @@ func updateBookSeriesByName(db DBInterface, id int, series string) (string, erro
 		return "", fmt.Errorf("updateBookSeriesByName, Couldn't retrieve updated value: %v", err)
 	}
 
-	if updatedSeries != series {
-		return "", fmt.Errorf("updateBookSeriesByName, Updated series %v does not match requested series %v", updatedSeries, series)
+	if updatedSeries.String != series {
+		return "", fmt.Errorf("updateBookSeriesByName, Updated series %v does not match requested series %v", updatedSeries.String, series)
 	}
 
-	return updatedSeries, nil
+	return updatedSeries.String, nil
 }
 
 func updateSeriesName(db DBInterface, id int, name string) (string, error) {
+	// get original series name to return if not updated
+	origNameSql := `
+        SELECT series_name
+        FROM series
+        WHERE series_id = ?
+    `
+	var origName string
+	if err := db.QueryRow(origNameSql, id).Scan(&origName); err != nil {
+		return "", fmt.Errorf("updateSeriesName: Could not retrieve series name for series id #%v: %v", id, err)
+	}
+
 	if len(name) == 0 {
-		return "", fmt.Errorf("updateSeriesName: Series cannot have empty name. Perhaps you want to delete the series?")
+		return origName, fmt.Errorf("updateSeriesName: Series cannot have empty name. Perhaps you want to delete the series?")
 	}
 
 	sqlStmt := `
@@ -1182,17 +1228,17 @@ func updateSeriesName(db DBInterface, id int, name string) (string, error) {
 
 	_, err := db.Exec(sqlStmt, name, id)
 	if err != nil {
-		return "", fmt.Errorf("updateSeriesName, Could not update series name: %v", err)
+		return origName, fmt.Errorf("updateSeriesName, Could not update series name: %v", err)
 	}
 
 	var updatedName string
 	if err := db.QueryRow("SELECT series_name FROM series WHERE series_id = ?",
 		id).Scan(&updatedName); err != nil {
-		return "", fmt.Errorf("updateSeriesName, Couldn't retrieve updated value: %v", err)
+		return origName, fmt.Errorf("updateSeriesName, Couldn't retrieve updated value: %v", err)
 	}
 
 	if updatedName != name {
-		return "", fmt.Errorf("updateSeriesName: Updated name %v does not match requested name %v",
+		return updatedName, fmt.Errorf("updateSeriesName: Updated name %v does not match requested name %v",
 			updatedName, name)
 	}
 
