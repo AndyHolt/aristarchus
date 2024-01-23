@@ -6,12 +6,18 @@
   up a little. See [[https://go.dev/doc/database/prepared-statements][Using prepared statements]]. Ensure the interface ~DBInterface~
   properly accounts for the use of prepared statements in its methods, so as to
   ensure type robustness.
-- [ ] Parallelism database lookup for speed, using Go routines (check how much
+- [ ] Parallelise database lookup for speed, using Go routines (check how much
   it actually speeds up looking up a couple of hundred/thousand books, a good
   point to be raised in "Building Aristarchus" blog post). Would it be faster to
   just get all the rows from the database in one big move, then process them
   (parallelly?) in Go?
 - [ ] Search interface
+- [ ] Improve handling of book status: Remove status column from books table,
+  add two more tables, one to store status values (owned, read, favourite, etc),
+  and one to map from book_id to status_id, so that multiple status descriptions
+  can be applied to a single book. Status attribute in book struct will need to
+  become a list, listing the various status strings attached to the book.
+- [ ] Add ratings(?) and notes for books
 - [ ] Add column for edition description, as complement to edition number.
   - E.g. if edition is "revised and expanded edition", that can't be contained
     in an integer column. Create a separate database column for handling.
