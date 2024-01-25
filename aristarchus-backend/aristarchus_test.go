@@ -3124,7 +3124,6 @@ func TestUpdateBookPurchaseDateNull(t *testing.T) {
 
 }
 
-// [todo] test deletion of book by ID
 func TestDeleteBook(t *testing.T) {
 	db, err := sql.Open("sqlite3", "testdb.sqlite")
 	if err != nil {
@@ -3255,7 +3254,6 @@ func TestDeleteBookInvalidId(t *testing.T) {
 	}
 }
 
-// [todo] test deletion of person by ID
 func TestDeletePerson(t *testing.T) {
 	db, err := sql.Open("sqlite3", "testdb.sqlite")
 	if err != nil {
@@ -3357,7 +3355,6 @@ func TestDeletePersonInUse(t *testing.T) {
 	}
 }
 
-// [todo] test deletion of publisher by ID
 func TestDeletePublisher(t *testing.T) {
 	db, err := sql.Open("sqlite3", "testdb.sqlite")
 	if err != nil {
@@ -3456,7 +3453,6 @@ func TestDeletePublisherInUse(t *testing.T) {
 	}
 }
 
-// [todo] test deletion of series by ID
 func TestDeleteSeries(t *testing.T) {
 	db, err := sql.Open("sqlite3", "testdb.sqlite")
 	if err != nil {
