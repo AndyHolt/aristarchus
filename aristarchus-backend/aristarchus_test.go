@@ -822,8 +822,6 @@ func TestPersonName(t *testing.T) {
 }
 
 func TestPersonNameInvalidId(t *testing.T) {
-	t.Errorf("Need to use invalid person id error")
-
 	db, err := sql.Open("sqlite3", "testdb.sqlite")
 	if err != nil {
 		t.Errorf("Problem opening database: %v", err)
@@ -840,11 +838,14 @@ func TestPersonNameInvalidId(t *testing.T) {
 			id,
 		)
 	} else {
-		t.Errorf(
-			"personName: invalid ID #%v returned (possibly correct) error: %v",
-			id,
-			err,
-		)
+		var invlPersIdErr *InvalidPersonIdError
+		if !errors.As(err, &invlPersIdErr) {
+			t.Errorf(
+				"personName returned unexpected error for invalid ID #%v: %v",
+				id,
+				err,
+			)
+		}
 	}
 	if result != expected {
 		t.Errorf(
@@ -941,29 +942,208 @@ func TestPersonIdEmptyString(t *testing.T) {
 }
 
 func TestBooksByPersonId(t *testing.T) {
-	t.Errorf("Test not yet implemented")
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	person := "Peter J. Gentry"
+	persId, err := personId(db, person)
+	if err != nil {
+		t.Errorf("Problem retrieving ID for person \"%v\": %v", person, err)
+	}
+
+	expected := []int{4, 5}
+
+	result, err := booksByPersonId(db, persId)
+	if err != nil {
+		t.Errorf(
+			"Problem retrieving books of person #%v %v: %v",
+			persId,
+			person,
+			err,
+		)
+	}
+
+	if len(result) != len(expected) {
+		t.Errorf(
+			"booksByPersonId returned unexpected value (slice length).\n"+
+				"Expected slice of length %v, got length %v\n"+
+				"Expected slice: %v, got: %v",
+			len(expected),
+			len(result),
+			expected,
+			result,
+		)
+	}
+	for i, b := range expected {
+		if result[i] != b {
+			t.Errorf(
+				"booksByPersonId returned unexpected value (slice element %v).\n"+
+					"Expected element: %v, got: %v\n"+
+					"Expected slice: %v, got: %v",
+				i,
+				b,
+				result[i],
+				expected,
+				result,
+			)
+		}
+	}
 }
 
 func TestBooksByPersonIdInvalidId(t *testing.T) {
-	// use InvalidPersonIdError to check correct error returned
-	t.Errorf("Test not yet implemented")
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	persId := 73
+	result, err := booksByPersonId(db, persId)
+	if err == nil {
+		t.Errorf("booksByPersonId did not return error for invalid id #%v", persId)
+	} else {
+		var invlPersIdErr *InvalidPersonIdError
+		if !errors.As(err, &invlPersIdErr) {
+			t.Errorf(
+				"booksByPersonId returned unexpected error for invalid id #%v: %v",
+				persId,
+				err,
+			)
+		}
+	}
+	if result != nil {
+		t.Errorf("booksByPersonId returned non-nil value for invalid id: %v", result)
+	}
 }
 
 func TestPublisherName(t *testing.T) {
-	t.Errorf("Test not yet implemented")
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	pubId := 1
+	expected := "IVP"
+
+	result, err := publisherName(db, pubId)
+	if err != nil {
+		t.Errorf("Unexpected error from publisherName: %v", err)
+	}
+	if result != expected {
+		t.Errorf(
+			"publisherName returned unexpected value. Expected %v, got %v.",
+			expected,
+			result,
+		)
+	}
 }
 
 func TestPublisherNameInvalidId(t *testing.T) {
-	t.Errorf("Test not yet implemented")
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	pubId := 7
+
+	result, err := publisherName(db, pubId)
+	if err == nil {
+		t.Errorf("publisherName did not return error for invalid ID #%v", pubId)
+	} else {
+		var invlPubIdErr *InvalidPublisherIdError
+		if !errors.As(err, &invlPubIdErr) {
+			t.Errorf(
+				"publisherName returned unexpected error for invalid ID #%v: %v",
+				pubId,
+				err,
+			)
+		}
+	}
+	if result != "" {
+		t.Errorf(
+			"publisherName returned unexpected result for invalid ID #%v: %v",
+			pubId,
+			result,
+		)
+	}
 }
 
 func TestPublisherBooks(t *testing.T) {
-	t.Errorf("Test not yet implemented")
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	pubId := 3
+	expected := []int{4, 5, 6}
+
+	result, err := publisherBooks(db, pubId)
+	if err != nil {
+		t.Errorf("publisherBooks, Unexpected error: %v", err)
+	}
+
+	if len(result) != len(expected) {
+		t.Errorf(
+			"publisherBooks returned unexpected result (slice length)\n"+
+				"Expected slice of length %v, but got length %v\n"+
+				"Expected slice: %v, but got: %v",
+			len(expected),
+			len(result),
+			expected,
+			result,
+		)
+	}
+	for i, b := range expected {
+		if result[i] != b {
+			t.Errorf(
+				"publisherBooks returned unexpected result (slice element %v)\n"+
+					"Expected element: %v, got element: %v\n"+
+					"Expected slice: %v, got slice: %v",
+				i,
+				b,
+				result[i],
+				expected,
+				result,
+			)
+		}
+	}
 }
 
 func TestPublisherBooksInvalidId(t *testing.T) {
-	// use InvalidPublisherIdError
-	t.Errorf("Test not yet implemented")
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	pubId := 7
+
+	result, err := publisherBooks(db, pubId)
+	if err == nil {
+		t.Errorf("publisherBooks did not return error for invalid ID #%v", pubId)
+	} else {
+		var invlPubIdErr *InvalidPublisherIdError
+		if !errors.As(err, &invlPubIdErr) {
+			t.Errorf(
+				"publisherBooks returned unexpected error for invalid ID #%v: %v",
+				pubId,
+				err,
+			)
+		}
+	}
+	if result != nil {
+		t.Errorf(
+			"publisherBooks returned unexpected result for invalid ID #%v: %v",
+			pubId,
+			result,
+		)
+	}
 }
 
 func TestPublisherId(t *testing.T) {
@@ -1135,21 +1315,130 @@ func TestSeriesIdEmptyString(t *testing.T) {
 }
 
 func TestSeriesBooks(t *testing.T) {
-	t.Errorf("Test not yet implemented")
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	serId := 1
+	expected := []int{2}
+
+	result, err := seriesBooks(db, serId)
+	if err != nil {
+		t.Errorf("seriesBooks, Unexpected error: %v", err)
+	}
+
+	if len(result) != len(expected) {
+		t.Errorf(
+			"seriesBooks returned unexpected result (slice length)\n"+
+				"Expected slice of length %v, but got length %v\n"+
+				"Expected slice: %v, but got: %v",
+			len(expected),
+			len(result),
+			expected,
+			result,
+		)
+	}
+	for i, b := range expected {
+		if result[i] != b {
+			t.Errorf(
+				"seriesBooks returned unexpected result (slice element %v)\n"+
+					"Expected element: %v, got element: %v\n"+
+					"Expected slice: %v, got slice: %v",
+				i,
+				b,
+				result[i],
+				expected,
+				result,
+			)
+		}
+	}
 }
 
 func TestSeriesBooksInvalidId(t *testing.T) {
-	// Check returns InvalidSeriesIdError
-	t.Errorf("Test not yet implemented")
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	serId := 5
+
+	result, err := seriesBooks(db, serId)
+	if err == nil {
+		t.Errorf("seriesBooks did not return error for invalid ID #%v", serId)
+	} else {
+		var invlSerIdErr *InvalidSeriesIdError
+		if !errors.As(err, &invlSerIdErr) {
+			t.Errorf(
+				"seriesBooks returned unexpected error for invalid ID #%v: %v",
+				serId,
+				err,
+			)
+		}
+	}
+	if result != nil {
+		t.Errorf(
+			"seriesBooks returned unexpected result for invalid ID #%v: %v",
+			serId,
+			result,
+		)
+	}
 }
 
 func TestSeriesName(t *testing.T) {
-    t.Errorf("Test not yet implemented")
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	serId := 1
+	expected := "Spectrum Multiview Books"
+
+	result, err := seriesName(db, serId)
+	if err != nil {
+		t.Errorf("Unexpected error from seriesName: %v", err)
+	}
+	if result != expected {
+		t.Errorf(
+			"seriesName returned unexpected value. Expected %v, got %v.",
+			expected,
+			result,
+		)
+	}
 }
 
 func TestSeriesNameInvalidId(t *testing.T) {
-    // Check returns InvalidSeriesIdError
-	t.Errorf("Test not yet implemented")
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	serId := 5
+
+	result, err := seriesName(db, serId)
+	if err == nil {
+		t.Errorf("seriesName did not return error for invalid ID #%v", serId)
+	} else {
+		var invlSerIdErr *InvalidSeriesIdError
+		if !errors.As(err, &invlSerIdErr) {
+			t.Errorf(
+				"seriesName returned unexpected error for invalid ID #%v: %v",
+				serId,
+				err,
+			)
+		}
+	}
+	if result != "" {
+		t.Errorf(
+			"seriesBooks returned unexpected result for invalid ID #%v: %v",
+			serId,
+			result,
+		)
+	}
 }
 
 func TestCheckBookInDb(t *testing.T) {
@@ -2943,9 +3232,325 @@ func TestDeleteBook(t *testing.T) {
 }
 
 func TestDeleteBookInvalidId(t *testing.T) {
-	t.Errorf("Test not yet implemented")
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	id := 43
+	err = deleteBook(db, id)
+	if err == nil {
+		t.Errorf("Deleting invalid book id #%v did not return error", id)
+	} else {
+		var invlBookIdErr *InvalidBookIdError
+		if !errors.As(err, &invlBookIdErr) {
+			t.Errorf(
+				"Deleting invalid book id #%v returned unexpected error "+
+					"(not InvalidBookIdError): %v",
+				id,
+				err,
+			)
+		}
+	}
 }
 
 // [todo] test deletion of person by ID
+func TestDeletePerson(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	newPerson := "Francis Turretin"
+	id, err := personId(db, newPerson)
+	if err != nil {
+		t.Errorf("Could not retrieve ID for new person %v: %v", newPerson, err)
+	}
+
+	err = deletePerson(db, id)
+	if err != nil {
+		t.Errorf("Problem deleting newly added person: %v ", err)
+	}
+
+	persName, err := personName(db, id)
+	if err == nil {
+		t.Errorf(
+			"personName did not raise error after deletion of person ID #%v: %v",
+			id,
+			err,
+		)
+	} else {
+		var invlPersIdErr *InvalidPersonIdError
+		if !errors.As(err, &invlPersIdErr) {
+			t.Errorf(
+				"Unexpected error raised by personName after deletion of"+
+					" person with ID #%v: %v",
+				id,
+				err,
+			)
+		}
+	}
+	if persName != "" {
+		t.Errorf("personName returned non-empty string after deletion of person")
+	}
+}
+
+func TestDeletePersonInvalidId(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	id := 26
+
+	err = deletePerson(db, id)
+	if err == nil {
+		t.Errorf(
+			"deletePerson did not return error for invalid id #%v",
+			id,
+		)
+	} else {
+		var invlPersIdErr *InvalidPersonIdError
+		if !errors.As(err, &invlPersIdErr) {
+			t.Errorf(
+				"deletePerson returned unexpected error for invalid ID #%v: %v",
+				id,
+				err,
+			)
+		}
+	}
+}
+
+func TestDeletePersonInUse(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	person := "Peter J. Gentry"
+	persId, err := personId(db, person)
+	if err != nil {
+		t.Errorf("Problem getting ID for %v: %v", person, err)
+	}
+
+	err = deletePerson(db, persId)
+	if err == nil {
+		t.Errorf(
+			"deletePerson did not return error for in use person #%v %v",
+			persId,
+			person,
+		)
+	} else {
+		var persInUseErr *PersonInUseError
+		if !errors.As(err, &persInUseErr) {
+			t.Errorf(
+				"deletePerson returned unexpected error for in use person #%v %v: %v",
+				persId,
+				person,
+				err,
+			)
+		}
+	}
+}
+
 // [todo] test deletion of publisher by ID
+func TestDeletePublisher(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	publisher := "Penguin Books"
+	pubId, err := publisherId(db, publisher)
+	if err != nil {
+		t.Errorf("publisherId returned unexpected error: %v", err)
+	}
+
+	err = deletePublisher(db, pubId)
+	if err != nil {
+		t.Errorf("deletePublisher gave unexpected error: %v", err)
+	}
+
+	name, err := publisherName(db, pubId)
+	if err == nil {
+		t.Errorf(
+			"Publisher still in DB after deletion, publisherName returned no error",
+		)
+	} else {
+		var invlPubIdErr *InvalidPublisherIdError
+		if !errors.As(err, &invlPubIdErr) {
+			t.Errorf(
+				"publisherName returned unexpected error after deletion of publisher: %v",
+				err,
+			)
+		}
+	}
+	if name != "" {
+		t.Errorf(
+			"publisherName returned unexpected result after "+
+				"deletion of publisher: %v",
+			name,
+		)
+	}
+}
+
+func TestDeletePublisherInvalidId(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	pubId := 7
+
+	err = deletePublisher(db, pubId)
+	if err == nil {
+		t.Errorf("deletePublisher did not return error for invalid ID #%v", pubId)
+	} else {
+		var invlPubIdErr *InvalidPublisherIdError
+		if !errors.As(err, &invlPubIdErr) {
+			t.Errorf(
+				"deletePublisher returned unexpected error for invalid ID #%v: %v",
+				pubId,
+				err,
+			)
+		}
+	}
+}
+
+func TestDeletePublisherInUse(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	publisher := "IVP"
+	pubId, err := publisherId(db, publisher)
+	if err != nil {
+		t.Errorf("Problem getting ID for %v: %v", publisher, err)
+	}
+
+	err = deletePublisher(db, pubId)
+	if err == nil {
+		t.Errorf(
+			"deletePublisher did not return error for in use publisher #%v %v",
+			pubId,
+			publisher,
+		)
+	} else {
+		var pubInUseErr *PublisherInUseError
+		if !errors.As(err, &pubInUseErr) {
+			t.Errorf(
+				"deletePublisher returned unexpected error for in use publisher #%v %v: %v",
+				pubId,
+				publisher,
+				err,
+			)
+		}
+	}
+}
+
 // [todo] test deletion of series by ID
+func TestDeleteSeries(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	series := "Cambridge Texts in the History of Political Thought"
+	serId, err := seriesId(db, series)
+	if err != nil {
+		t.Errorf("seriesId returned unexpected error: %v", err)
+	}
+
+	err = deleteSeries(db, serId)
+	if err != nil {
+		t.Errorf("deleteSeries gave unexpected error: %v", err)
+	}
+
+	name, err := seriesName(db, serId)
+	if err == nil {
+		t.Errorf(
+			"Series still in DB after deletion, seriesName returned no error",
+		)
+	} else {
+		var invlSerIdErr *InvalidSeriesIdError
+		if !errors.As(err, &invlSerIdErr) {
+			t.Errorf(
+				"seriesName returned unexpected error after deletion of series: %v",
+				err,
+			)
+		}
+	}
+	if name != "" {
+		t.Errorf(
+			"seriesName returned unexpected result after "+
+				"deletion of series: %v",
+			name,
+		)
+	}
+}
+
+func TestDeleteSeriesInvalidId(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	serId := 5
+
+	err = deleteSeries(db, serId)
+	if err == nil {
+		t.Errorf("deleteSeries did not return error for invalid ID #%v", serId)
+	} else {
+		var invlSerIdErr *InvalidSeriesIdError
+		if !errors.As(err, &invlSerIdErr) {
+			t.Errorf(
+				"deleteSeries returned unexpected error for invalid ID #%v: %v",
+				serId,
+				err,
+			)
+		}
+	}
+}
+
+func TestDeleteSeriesInUse(t *testing.T) {
+	db, err := sql.Open("sqlite3", "testdb.sqlite")
+	if err != nil {
+		t.Errorf("Problem opening database: %v", err)
+	}
+	defer db.Close()
+
+	series := "Spectrum Multiview Books"
+	serId, err := seriesId(db, series)
+	if err != nil {
+		t.Errorf("Problem getting ID for %v: %v", series, err)
+	}
+
+	err = deleteSeries(db, serId)
+	if err == nil {
+		t.Errorf(
+			"deleteSeries did not return error for in use series #%v %v",
+			serId,
+			series,
+		)
+	} else {
+		var serInUseErr *SeriesInUseError
+		if !errors.As(err, &serInUseErr) {
+			t.Errorf(
+				"deleteSeries returned unexpected error for in use series #%v %v: %v",
+				serId,
+				series,
+				err,
+			)
+		}
+	}
+}

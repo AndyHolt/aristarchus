@@ -341,7 +341,7 @@ func BookIDValid(db DBInterface, id int) (bool, error) {
 func getBookById(db DBInterface, id int) (Book, error) {
 	bookValid, err := BookIDValid(db, id)
 	if err != nil {
-		return Book{}, fmt.Errorf("getBookById, could not validate id #%v: %v", id, err)
+		return Book{}, fmt.Errorf("getBookById, could not validate id #%v: %w", id, err)
 	}
 	if !bookValid {
 		return Book{}, &InvalidBookIdError{"getBookById", id}
@@ -437,9 +437,20 @@ func (e *InvalidPersonIdError) Error() string {
 }
 
 func personName(db DBInterface, id int) (string, error) {
-	// [todo] use InvalidPersonIdError here
-	if id == 0 {
-		return "", fmt.Errorf("personName: Invalid ID: %v", id)
+	// check valid person id
+	checkPersonIdSql := `SELECT COUNT(*)
+        FROM people
+        WHERE person_id = ?`
+	var count int
+	if err := db.QueryRow(checkPersonIdSql, id).Scan(&count); err != nil {
+		return "", fmt.Errorf(
+			"personName, Could not look up person ID #%v: %v",
+			id,
+			err,
+		)
+	}
+	if count == 0 {
+		return "", &InvalidPersonIdError{"personName", id}
 	}
 
 	var name string
@@ -752,7 +763,7 @@ func seriesName(db DBInterface, id int) (string, error) {
 			err,
 		)
 	}
-    return name, nil
+	return name, nil
 }
 
 type AddingDuplicateBookError struct {
@@ -1648,7 +1659,7 @@ func updateBookPurchaseDate(db DBInterface, id int, date PurchasedDate) (Purchas
 func deleteBook(db *sql.DB, id int) error {
 	book, err := getBookById(db, id)
 	if err != nil {
-		return fmt.Errorf("deleteBook: %v", err)
+		return fmt.Errorf("deleteBook: %w", err)
 	}
 
 	authorList := nameListFromString(book.author)
@@ -1713,7 +1724,7 @@ func deleteBook(db *sql.DB, id int) error {
 			}
 		}
 	}
-	
+
 	// Delete the book itself
 	_, err = tx.Exec(bookDeletion, id)
 	if err != nil {
@@ -1797,7 +1808,7 @@ func deletePerson(db DBInterface, id int) error {
 	books, err := booksByPersonId(db, id)
 	if err != nil {
 		return fmt.Errorf(
-			"deletePerson, problem checking books by person: %v",
+			"deletePerson, problem checking books by person: %w",
 			err,
 		)
 	}
@@ -1805,7 +1816,7 @@ func deletePerson(db DBInterface, id int) error {
 		name, err := personName(db, id)
 		if err != nil {
 			return fmt.Errorf(
-				"deletePerson, issue getting name for person #%v: %v",
+				"deletePerson, issue getting name for person #%v: %w",
 				id,
 				err,
 			)
@@ -1850,7 +1861,7 @@ func deletePublisher(db DBInterface, id int) error {
 	books, err := publisherBooks(db, id)
 	if err != nil {
 		return fmt.Errorf(
-			"deletePublisher, problem checking books by publisher #%v: %v",
+			"deletePublisher, problem checking books by publisher #%v: %w",
 			id,
 			err,
 		)
@@ -1859,7 +1870,7 @@ func deletePublisher(db DBInterface, id int) error {
 		name, err := publisherName(db, id)
 		if err != nil {
 			return fmt.Errorf(
-				"deletePublisher, issue getting name for publisher #%v: %v",
+				"deletePublisher, issue getting name for publisher #%v: %w",
 				id,
 				err,
 			)
@@ -1876,7 +1887,7 @@ func deletePublisher(db DBInterface, id int) error {
 	sqlDeletePublisher := "DELETE FROM publishers WHERE publisher_id = ?"
 	_, err = db.Exec(sqlDeletePublisher, id)
 	if err != nil {
-		return fmt.Errorf("deletePublisher, Couldn't delete publisher #%v: %v",
+		return fmt.Errorf("deletePublisher, Couldn't delete publisher #%v: %w",
 			id, err)
 	}
 
@@ -1885,13 +1896,13 @@ func deletePublisher(db DBInterface, id int) error {
 
 type SeriesInUseError struct {
 	CallFunc string
-	Name string
-	ID int
-	books []int
+	Name     string
+	ID       int
+	books    []int
 }
 
 func (e *SeriesInUseError) Error() string {
-    return fmt.Sprintf(
+	return fmt.Sprintf(
 		"%v: Cannot delete series ID #%v %v as series has %v book(s) in database.",
 		e.CallFunc,
 		e.ID,
@@ -1905,7 +1916,7 @@ func deleteSeries(db DBInterface, id int) error {
 	books, err := seriesBooks(db, id)
 	if err != nil {
 		return fmt.Errorf(
-			"deleteSeries, problem checking books in series #%v: %v",
+			"deleteSeries, problem checking books in series #%v: %w",
 			id,
 			err,
 		)
@@ -1914,16 +1925,16 @@ func deleteSeries(db DBInterface, id int) error {
 		name, err := seriesName(db, id)
 		if err != nil {
 			return fmt.Errorf(
-				"deleteSeries, issue getting name for series #%v: %v",
+				"deleteSeries, issue getting name for series #%v: %w",
 				id,
 				err,
 			)
 		}
 		return &SeriesInUseError{
 			CallFunc: "deleteSeries",
-			Name: name,
-			ID: id,
-			books: books,
+			Name:     name,
+			ID:       id,
+			books:    books,
 		}
 	}
 
@@ -1931,7 +1942,7 @@ func deleteSeries(db DBInterface, id int) error {
 	sqlDeleteSeries := "DELETE FROM series WHERE series_id = ?"
 	_, err = db.Exec(sqlDeleteSeries, id)
 	if err != nil {
-		return fmt.Errorf("deleteSeries, Couldn't delete series #%v: %v", id,
+		return fmt.Errorf("deleteSeries, Couldn't delete series #%v: %w", id,
 			err)
 	}
 
