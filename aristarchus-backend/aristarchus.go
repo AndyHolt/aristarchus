@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"slices"
@@ -248,7 +249,9 @@ func getAuthorsListById(db DBInterface, id int) ([]string, error) {
             ON book_author.author_id = people.person_id
           WHERE book_author.book_id = ?`
 	authorRows, err := db.Query(sqlStmt, id)
-	// [review] I think we need to handle no rows case as meaning no authors, not an error!
+	// [review] I think we need to handle no rows case as meaning no authors,
+	// not an error! (see unit tests for current behaviour testing, then work
+	// out what's happening in the code.)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return authors, fmt.Errorf("getAuthorsListById %d: No such book", id)
@@ -268,6 +271,17 @@ func getAuthorsListById(db DBInterface, id int) ([]string, error) {
 }
 
 func getEditorsListById(db DBInterface, id int) ([]string, error) {
+	bookValid, err := BookIDValid(db, id)
+	if err != nil {
+		return []string{}, fmt.Errorf(
+			"getEditorsListById, could not validate book id #%v: %v",
+			id, err,
+		)
+	}
+	if !bookValid {
+		return []string{}, &InvalidBookIdError{"getEditorsListById", id}
+	}
+
 	var editors []string
 	sqlStmt := `
           SELECT people.name
@@ -276,7 +290,9 @@ func getEditorsListById(db DBInterface, id int) ([]string, error) {
             ON book_editor.editor_id = people.person_id
           WHERE book_editor.book_id = ?`
 	editorRows, err := db.Query(sqlStmt, id)
-	// [review] I think we need to handle no rows case as meaning no editors, not an error!
+	// [review] I think we need to handle no rows case as meaning no editors,
+	// not an error! (see unit tests for current behaviour testing, then work
+	// out what's happening in the code.)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return editors, fmt.Errorf("getEditorsListById %d: No such book", id)
@@ -298,15 +314,15 @@ func getEditorsListById(db DBInterface, id int) ([]string, error) {
 
 type InvalidBookIdError struct {
 	CallFunc string
-	BookId int
+	BookId   int
 }
 
 func (e *InvalidBookIdError) Error() string {
-    return fmt.Sprintf("%v: Unknown book ID #%v", e.CallFunc, e.BookId)
+	return fmt.Sprintf("%v: Unknown book ID #%v", e.CallFunc, e.BookId)
 }
 
 func BookIDValid(db DBInterface, id int) (bool, error) {
-    sqlStmt := `
+	sqlStmt := `
         SELECT COUNT(*)
         FROM books
         WHERE book_id = ?`
@@ -411,7 +427,42 @@ func printBookList(db DBInterface) ([]Book, error) {
 	return bookList, nil
 }
 
+type InvalidPersonIdError struct {
+	CallFunc string
+	ID       int
+}
+
+func (e *InvalidPersonIdError) Error() string {
+	return fmt.Sprintf("%v: Unknown person ID #%v", e.CallFunc, e.ID)
+}
+
+func personName(db DBInterface, id int) (string, error) {
+	// [todo] use InvalidPersonIdError here
+	if id == 0 {
+		return "", fmt.Errorf("personName: Invalid ID: %v", id)
+	}
+
+	var name string
+	nameSql := `SELECT name
+        FROM people
+        WHERE person_id = ?`
+
+	// [todo] Use InvalidPersonIdError if invalid ID is given
+	if err := db.QueryRow(nameSql, id).Scan(&name); err != nil {
+		return "", fmt.Errorf(
+			"personId: Issue retrieving id #%v from database, %v ",
+			id,
+			err,
+		)
+	}
+	return name, nil
+}
+
 func personId(db DBInterface, person string) (int, error) {
+	if len(person) == 0 {
+		return 0, fmt.Errorf("personId: Person's name cannot be empty.")
+	}
+
 	var id int
 	if err := db.QueryRow("SELECT person_id FROM people WHERE name = ?",
 		person).Scan(&id); err != nil {
@@ -432,7 +483,66 @@ func personId(db DBInterface, person string) (int, error) {
 	return id, nil
 }
 
+func booksByPersonId(db DBInterface, id int) ([]int, error) {
+	var bookList []int
+
+	// check valid person id
+	checkPersonSql := `SELECT COUNT(*)
+        FROM people
+        WHERE person_id = ?`
+	var count int
+	if err := db.QueryRow(checkPersonSql, id).Scan(&count); err != nil {
+		return bookList, fmt.Errorf(
+			"booksByPersonId: Could not look up person ID #%v in database: %v",
+			id,
+			err,
+		)
+	}
+	if count == 0 {
+		return bookList, &InvalidPersonIdError{"booksByPersonId", id}
+	}
+
+	bookAuthorSql := `
+        SELECT book_id
+        FROM book_author
+        WHERE author_id = ?
+        UNION
+        SELECT book_id
+        FROM book_editor
+        WHERE editor_id = ?`
+	var bookId int
+	rows, err := db.Query(bookAuthorSql, id, id)
+	if err != nil {
+		return bookList, fmt.Errorf(
+			"booksByPersonId: Couldn't retrieve books authored by person ID #%v, %v",
+			id,
+			err,
+		)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		if err := rows.Scan(&bookId); err != nil {
+			return bookList, fmt.Errorf(
+				"booksByPersonId: Issue scanning database query result: %v",
+				err,
+			)
+		}
+		bookList = append(bookList, bookId)
+	}
+	if err := rows.Err(); err != nil {
+		return bookList, fmt.Errorf(
+			"booksByPersonId, rows.Next() error: %v",
+			err,
+		)
+	}
+	return bookList, nil
+}
+
 func publisherId(db DBInterface, publisher string) (int, error) {
+	if len(publisher) == 0 {
+		return 0, fmt.Errorf("publisherId: Publisher name cannot be empty")
+	}
+
 	var id int
 	if err := db.QueryRow("SELECT publisher_id FROM publishers WHERE name = ?",
 		publisher).Scan(&id); err != nil {
@@ -454,9 +564,91 @@ func publisherId(db DBInterface, publisher string) (int, error) {
 	return id, nil
 }
 
+func publisherName(db DBInterface, id int) (string, error) {
+	// check valid publisher id
+	checkPublisherSql := `SELECT COUNT(*)
+        FROM publishers
+        WHERE publisher_id = ?`
+	var count int
+	if err := db.QueryRow(checkPublisherSql, id).Scan(&count); err != nil {
+		return "", fmt.Errorf(
+			"publisherName: Could not look up publisher #%v in database: %v",
+			id,
+			err,
+		)
+	}
+	if count == 0 {
+		return "", &InvalidPublisherIdError{"publisherBooks", id}
+	}
+
+	// get publisher name
+	publisherNameSql := `SELECT name
+        FROM publishers
+        WHERE publisher_id = ?`
+	var name string
+	if err := db.QueryRow(publisherNameSql, id).Scan(&name); err != nil {
+		return "", fmt.Errorf(
+			"publisherName, Could not retrieve publisher #%v name: %v",
+			id,
+			err,
+		)
+	}
+	return name, nil
+}
+
+func publisherBooks(db DBInterface, id int) ([]int, error) {
+	var bookList []int
+
+	// check valid publisher id
+	checkPublisherSql := `SELECT COUNT(*)
+        FROM publishers
+        WHERE publisher_id = ?`
+	var count int
+	if err := db.QueryRow(checkPublisherSql, id).Scan(&count); err != nil {
+		return bookList, fmt.Errorf(
+			"publisherBooks: Could not look up publisher #%v in database: %v",
+			id,
+			err,
+		)
+	}
+	if count == 0 {
+		return bookList, &InvalidPublisherIdError{"publisherBooks", id}
+	}
+
+	publisherBooksSql := `SELECT book_id
+        FROM books
+        WHERE publisher_id = ?`
+	var bookId int
+	rows, err := db.Query(publisherBooksSql, id)
+	if err != nil {
+		return bookList, fmt.Errorf(
+			"publisherBooks, Couldn't retrieve books from publisher ID #%v: %v",
+			id,
+			err,
+		)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		if err := rows.Scan(&bookId); err != nil {
+			return bookList, fmt.Errorf(
+				"publisherBooks, Issue processing database query result: %v",
+				err,
+			)
+		}
+		bookList = append(bookList, bookId)
+	}
+	if err := rows.Err(); err != nil {
+		return bookList, fmt.Errorf(
+			"publisherBooks, rows.Next() error: %v",
+			err,
+		)
+	}
+	return bookList, nil
+}
+
 func seriesId(db DBInterface, series string) (int, error) {
 	if len(series) == 0 {
-		return 0, nil
+		return 0, fmt.Errorf("seriesId: Cannot have empty series name")
 	}
 
 	var id int
@@ -479,6 +671,88 @@ func seriesId(db DBInterface, series string) (int, error) {
 		}
 	}
 	return id, nil
+}
+
+func seriesBooks(db DBInterface, id int) ([]int, error) {
+	var bookList []int
+
+	// check valid series id
+	checkSeriesSql := `SELECT COUNT(*)
+        FROM series
+        WHERE series_id = ?`
+	var count int
+	if err := db.QueryRow(checkSeriesSql, id).Scan(&count); err != nil {
+		return bookList, fmt.Errorf(
+			"seriesBooks, Could not look up series ID #%v: %v",
+			id,
+			err,
+		)
+	}
+	if count == 0 {
+		return bookList, &InvalidSeriesIdError{"seriesBooks", id}
+	}
+
+	seriesBooksSql := `SELECT book_id
+        FROM books
+        WHERE series_id = ?`
+	var bookId int
+	rows, err := db.Query(seriesBooksSql, id)
+	if err != nil {
+		return bookList, fmt.Errorf(
+			"seriesBooks, Couldn't retrieve books from publisher ID #%v: %v",
+			id,
+			err,
+		)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		if err := rows.Scan(&bookId); err != nil {
+			return bookList, fmt.Errorf(
+				"seriesBooks, Issue processing database query result: %v",
+				err,
+			)
+		}
+		bookList = append(bookList, bookId)
+	}
+	if err := rows.Err(); err != nil {
+		return bookList, fmt.Errorf(
+			"seriesBooks, rows.Next() error: %v",
+			err,
+		)
+	}
+	return bookList, nil
+}
+
+func seriesName(db DBInterface, id int) (string, error) {
+	// check valid series id
+	checkSeriesSql := `SELECT COUNT(*)
+        FROM series
+        WHERE series_id = ?`
+	var count int
+	if err := db.QueryRow(checkSeriesSql, id).Scan(&count); err != nil {
+		return "", fmt.Errorf(
+			"seriesName, Could not look up series ID #%v: %v",
+			id,
+			err,
+		)
+	}
+	if count == 0 {
+		return "", &InvalidSeriesIdError{"seriesName", id}
+	}
+
+	// get series name
+	seriesNameSql := `SELECT series_name
+        FROM series
+        WHERE series_id = ?`
+	var name string
+	if err := db.QueryRow(seriesNameSql, id).Scan(&name); err != nil {
+		return "", fmt.Errorf(
+			"seriesName, Could not retrieve series #%v name: %v",
+			id,
+			err,
+		)
+	}
+    return name, nil
 }
 
 type AddingDuplicateBookError struct {
@@ -540,19 +814,18 @@ func checkBookInDb(db DBInterface, b *Book) (int, error) {
 			return 0, fmt.Errorf("checkBookInDb, SQL scan error, %v", scanErr)
 		}
 	} else {
-		return id, &AddingDuplicateBookError{b, id}
+		return id, nil
 	}
 }
 
 func addBook(db *sql.DB, b *Book) (int, error) {
 	// check if book is already in database
-	id, bookInDbErr := checkBookInDb(db, b)
-	if bookInDbErr != nil {
-		if _, ok := bookInDbErr.(*AddingDuplicateBookError); ok {
-			return id, bookInDbErr
-		} else {
-			return id, fmt.Errorf("addBook, %v", bookInDbErr)
-		}
+	id, err := checkBookInDb(db, b)
+	if err != nil {
+		return id, fmt.Errorf("addbook, Couldn't check for duplicate book: %v", err)
+	}
+	if id != 0 {
+		return id, &AddingDuplicateBookError{b, id}
 	}
 
 	// handle people
@@ -1220,9 +1493,22 @@ func updateBookSeriesById(db DBInterface, id int, series int) (int, error) {
 }
 
 func updateBookSeriesByName(db DBInterface, id int, series string) (string, error) {
-	serId, err := seriesId(db, series)
-	if err != nil {
-		return "", fmt.Errorf("updateBookSeriesByName, Couldn't get series id for %v: %v", series, err)
+	var serId int
+	var err error
+
+	// Check for special case that series is empty string, in which case we are
+	// to remove the series value from book, setting NULL value in database
+	if len(series) == 0 {
+		serId = 0
+	} else {
+		serId, err = seriesId(db, series)
+		if err != nil {
+			return "", fmt.Errorf(
+				"updateBookSeriesByName, Couldn't get series id for %v: %v",
+				series,
+				err,
+			)
+		}
 	}
 
 	_, err = updateBookSeriesById(db, id, serId)
@@ -1360,13 +1646,19 @@ func updateBookPurchaseDate(db DBInterface, id int, date PurchasedDate) (Purchas
 }
 
 func deleteBook(db *sql.DB, id int) error {
-	// delete from book_author where book_id = id
-	// delete from book_editor where book_id = id
-	// delete from books where book_id = id
-
-	_, err := getBookById(db, id)
+	book, err := getBookById(db, id)
 	if err != nil {
 		return fmt.Errorf("deleteBook: %v", err)
+	}
+
+	authorList := nameListFromString(book.author)
+	editorList := nameListFromString(book.editor)
+	var peopleList []string
+	for _, p := range authorList {
+		peopleList = append(peopleList, p)
+	}
+	for _, p := range editorList {
+		peopleList = append(peopleList, p)
 	}
 
 	// use transaction to ensure removal of authors/editors and book is atomic
@@ -1380,19 +1672,99 @@ func deleteBook(db *sql.DB, id int) error {
 	editorDeletion := "DELETE FROM book_editor WHERE book_id = ?"
 	bookDeletion := "DELETE FROM books       WHERE book_id = ?"
 
+	// Remove author-book association
 	_, err = tx.Exec(authorDeletion, id)
 	if err != nil {
-		return fmt.Errorf("deleteBook: Problem removing book from book_author table: %v", err)
+		return fmt.Errorf(
+			"deleteBook: Problem removing book from book_author table: %v",
+			err,
+		)
 	}
 
+	// Remove editor-book association
 	_, err = tx.Exec(editorDeletion, id)
 	if err != nil {
-		return fmt.Errorf("deleteBook: Problem removing book from book_editor table: %v", err)
+		return fmt.Errorf(
+			"deleteBook: Problem removing book from book_editor table: %v",
+			err,
+		)
 	}
 
+	// Delete any authors/editors who don't have other books in DB
+	for _, p := range peopleList {
+		pid, err := personId(tx, p)
+		if err != nil {
+			return fmt.Errorf("deleteBook: %v", err)
+		}
+		err = deletePerson(tx, pid)
+		if err != nil {
+			// if the error from deletePerson *is* a PersonInUseError, we don't
+			// need to do anything as it simply means we haven't, and shouldn't,
+			// delete that person. If there is any other error, we need to deal
+			// with it.
+			var pInUseErr *PersonInUseError
+			if !errors.As(err, &pInUseErr) {
+				return fmt.Errorf(
+					"deleteBook, Problem deleting person ID #%v %v: %v",
+					pid,
+					p,
+					err,
+				)
+			}
+		}
+	}
+	
+	// Delete the book itself
 	_, err = tx.Exec(bookDeletion, id)
 	if err != nil {
 		return fmt.Errorf("deleteBook: Problem removing book from book table: %v", err)
+	}
+
+	// Delete publisher if no other books in DB
+	pubId, err := publisherId(tx, book.publisher)
+	if err != nil {
+		return fmt.Errorf(
+			"deleteBook, problem retrieving publisher %v: %v",
+			book.publisher,
+			err,
+		)
+	}
+	err = deletePublisher(tx, pubId)
+	if err != nil {
+		// if error from deletePublisher is PublisherInUseError, can be ignored
+		var pubInUseErr *PublisherInUseError
+		if !errors.As(err, &pubInUseErr) {
+			return fmt.Errorf(
+				"deleteBook, problem deleting publisher ID #%v: %v",
+				pubId,
+				err,
+			)
+		}
+	}
+
+	// Delete series, if book has a series and if series has no other books
+	if book.series != "" {
+		serId, err := seriesId(tx, book.series)
+		if err != nil {
+			return fmt.Errorf(
+				"deleteBook, problem retrieving series %v: %v",
+				book.series,
+				err,
+			)
+		}
+		err = deleteSeries(tx, serId)
+		if err != nil {
+			// if error from deleteSeries is SeriesInUseError, can be ignored
+			var serInUseErr *SeriesInUseError
+			if !errors.As(err, &serInUseErr) {
+				return fmt.Errorf(
+					"deleteBook, problem deleting series ID #%v %v: %v",
+					serId,
+					book.series,
+					err,
+				)
+			}
+		}
 	}
 
 	err = tx.Commit()
@@ -1403,31 +1775,52 @@ func deleteBook(db *sql.DB, id int) error {
 	return nil
 }
 
+type PersonInUseError struct {
+	CallFunc string
+	Name     string
+	ID       int
+	books    []int
+}
+
+func (e *PersonInUseError) Error() string {
+	return fmt.Sprintf(
+		"%v: Cannot delete person ID#%v %v as they have %v book(s) in database.",
+		e.CallFunc,
+		e.ID,
+		e.Name,
+		len(e.books),
+	)
+}
+
 func deletePerson(db DBInterface, id int) error {
-	var personBooks int
-
-	sqlCheckBooks := `
-        SELECT COUNT(*)
-        FROM (
-            SELECT book_id
-            FROM book_author
-            WHERE author_id = ?
-            UNION
-            SELECT book_id
-            FROM book_editor
-            WHERE editor_id = ?
-        )
-    `
-	if err := db.QueryRow(sqlCheckBooks, id, id).Scan(&personBooks); err != nil {
-		return fmt.Errorf("deletePerson, Couldn't check person's books in db: %v",
-			err)
+	// Check if person is in use (has books in DB), and raise error if so
+	books, err := booksByPersonId(db, id)
+	if err != nil {
+		return fmt.Errorf(
+			"deletePerson, problem checking books by person: %v",
+			err,
+		)
 	}
-	if personBooks != 0 {
-		return fmt.Errorf("deletePerson: Person #%v has books in db and cannot be deleted.", id)
+	if len(books) != 0 {
+		name, err := personName(db, id)
+		if err != nil {
+			return fmt.Errorf(
+				"deletePerson, issue getting name for person #%v: %v",
+				id,
+				err,
+			)
+		}
+		return &PersonInUseError{
+			CallFunc: "deletePerson",
+			Name:     name,
+			ID:       id,
+			books:    books,
+		}
 	}
 
+	// If they don't have books in DB, can now be safely deleted
 	sqlDeletePerson := "DELETE FROM people WHERE person_id = ?"
-	_, err := db.Exec(sqlDeletePerson, id)
+	_, err = db.Exec(sqlDeletePerson, id)
 	if err != nil {
 		return fmt.Errorf("deletePerson, problem deleting person: %v", err)
 	}
@@ -1435,24 +1828,53 @@ func deletePerson(db DBInterface, id int) error {
 	return nil
 }
 
+type PublisherInUseError struct {
+	CallFunc string
+	Name     string
+	ID       int
+	books    []int
+}
+
+func (e *PublisherInUseError) Error() string {
+	return fmt.Sprintf(
+		"%v: Cannot delete publisher ID#%v %v as they have %v book(s) in database.",
+		e.CallFunc,
+		e.ID,
+		e.Name,
+		len(e.books),
+	)
+}
+
 func deletePublisher(db DBInterface, id int) error {
-	var publisherBooks int
-
-	sqlCheckBooks := `
-        SELECT COUNT(*)
-        FROM books
-        WHERE publisher_id = ?
-    `
-	if err := db.QueryRow(sqlCheckBooks, id).Scan(&publisherBooks); err != nil {
-		return fmt.Errorf("deletePublisher: Couldn't check publisher's books in db: %v",
-			err)
+	// Check if publisher has books in DB, and raise error if so
+	books, err := publisherBooks(db, id)
+	if err != nil {
+		return fmt.Errorf(
+			"deletePublisher, problem checking books by publisher #%v: %v",
+			id,
+			err,
+		)
 	}
-	if publisherBooks != 0 {
-		return fmt.Errorf("deletePublisher: Publisher #%v has books in db and cannot be deleted.", id)
+	if len(books) != 0 {
+		name, err := publisherName(db, id)
+		if err != nil {
+			return fmt.Errorf(
+				"deletePublisher, issue getting name for publisher #%v: %v",
+				id,
+				err,
+			)
+		}
+		return &PublisherInUseError{
+			CallFunc: "deletePublisher",
+			Name:     name,
+			ID:       id,
+			books:    books,
+		}
 	}
 
+	// After checking if publisher has books, can now safely delete them
 	sqlDeletePublisher := "DELETE FROM publishers WHERE publisher_id = ?"
-	_, err := db.Exec(sqlDeletePublisher, id)
+	_, err = db.Exec(sqlDeletePublisher, id)
 	if err != nil {
 		return fmt.Errorf("deletePublisher, Couldn't delete publisher #%v: %v",
 			id, err)
@@ -1461,24 +1883,53 @@ func deletePublisher(db DBInterface, id int) error {
 	return nil
 }
 
+type SeriesInUseError struct {
+	CallFunc string
+	Name string
+	ID int
+	books []int
+}
+
+func (e *SeriesInUseError) Error() string {
+    return fmt.Sprintf(
+		"%v: Cannot delete series ID #%v %v as series has %v book(s) in database.",
+		e.CallFunc,
+		e.ID,
+		e.Name,
+		len(e.books),
+	)
+}
+
 func deleteSeries(db DBInterface, id int) error {
-	var seriesBooks int
-
-	sqlCheckBooks := `
-        SELECT COUNT(*)
-        FROM books
-        WHERE series_id = ?
-    `
-	if err := db.QueryRow(sqlCheckBooks, id).Scan(&seriesBooks); err != nil {
-		return fmt.Errorf("deleteSeries, Couldn't check series books in db: %v",
-			err)
+	// Check if series has books in DB, and raise error if so
+	books, err := seriesBooks(db, id)
+	if err != nil {
+		return fmt.Errorf(
+			"deleteSeries, problem checking books in series #%v: %v",
+			id,
+			err,
+		)
 	}
-	if seriesBooks != 0 {
-		return fmt.Errorf("deleteSeries: Series #%v has books in db and cannot be deleted.", id)
+	if len(books) != 0 {
+		name, err := seriesName(db, id)
+		if err != nil {
+			return fmt.Errorf(
+				"deleteSeries, issue getting name for series #%v: %v",
+				id,
+				err,
+			)
+		}
+		return &SeriesInUseError{
+			CallFunc: "deleteSeries",
+			Name: name,
+			ID: id,
+			books: books,
+		}
 	}
 
+	// After checking if series has books, can now safely delete series
 	sqlDeleteSeries := "DELETE FROM series WHERE series_id = ?"
-	_, err := db.Exec(sqlDeleteSeries, id)
+	_, err = db.Exec(sqlDeleteSeries, id)
 	if err != nil {
 		return fmt.Errorf("deleteSeries, Couldn't delete series #%v: %v", id,
 			err)
